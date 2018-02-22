@@ -1,108 +1,59 @@
-// encapsulated variables
-var UNDEFINED,
-	doc = win.document,
-	math = Math,
-	mathRound = math.round,
-	mathFloor = math.floor,
-	mathCeil = math.ceil,
-	mathMax = math.max,
-	mathMin = math.min,
-	mathAbs = math.abs,
-	mathCos = math.cos,
-	mathSin = math.sin,
-	mathPI = math.PI,
-	deg2rad = mathPI * 2 / 360,
-
-
-	// some variables
-	userAgent = (win.navigator && win.navigator.userAgent) || '',
-	isOpera = win.opera,
-	isMS = /(msie|trident|edge)/i.test(userAgent) && !isOpera,
-	docMode8 = doc && doc.documentMode === 8,
-	isWebKit = !isMS && /AppleWebKit/.test(userAgent),
-	isFirefox = /Firefox/.test(userAgent),
-	isTouchDevice = /(Mobile|Android|Windows Phone)/.test(userAgent),
-	SVG_NS = 'http://www.w3.org/2000/svg',
-	hasSVG = doc && doc.createElementNS && !!doc.createElementNS(SVG_NS, 'svg').createSVGRect,
-	hasBidiBug = isFirefox && parseInt(userAgent.split('Firefox/')[1], 10) < 4, // issue #38
-	useCanVG = doc && !hasSVG && !isMS && !!doc.createElement('canvas').getContext,
-	Renderer,
-	hasTouch,
-	symbolSizes = {},
-	idCounter = 0,
-	garbageBin,
-	defaultOptions,
-	dateFormat, // function
-	pathAnim,
-	timeUnits,
-	noop = function () {},
-	charts = [],
-	chartCount = 0,
-	PRODUCT = '@product.name@',
-	VERSION = '@product.version@',
-
-	// some constants for frequently used strings
-	DIV = 'div',
-	ABSOLUTE = 'absolute',
-	RELATIVE = 'relative',
-	HIDDEN = 'hidden',
-	PREFIX = 'highcharts-',
-	VISIBLE = 'visible',
-	PX = 'px',
-	NONE = 'none',
-	M = 'M',
-	L = 'L',
-	numRegex = /[0-9]/g,
-	NORMAL_STATE = '',
-	HOVER_STATE = 'hover',
-	SELECT_STATE = 'select',
-	marginNames = ['plotTop', 'marginRight', 'marginBottom', 'plotLeft'],
-
-	// Object for extending Axis
-	AxisPlotLineOrBandExtension,
-
-	// constants for attributes
-	STROKE_WIDTH = 'stroke-width',
-
-	// time methods, changed based on whether or not UTC is used
-	Date,  // Allow using a different Date class
-	makeTime,
-	timezoneOffset,
-	getTimezoneOffset,
-	getMinutes,
-	getHours,
-	getDay,
-	getDate,
-	getMonth,
-	getFullYear,
-	setMilliseconds,
-	setSeconds,
-	setMinutes,
-	setHours,
-	setDate,
-	setMonth,
-	setFullYear,
-
-
-	// lookup over the types and the associated classes
-	seriesTypes = {},
-	Highcharts;
-
 /**
- * Provide error messages for debugging, with links to online explanation
+ * (c) 2010-2017 Torstein Honsi
+ *
+ * License: www.highcharts.com/license
  */
-function error(code, stop) {
-	var msg = 'Highcharts error #' + code + ': www.highcharts.com/errors/' + code;
-	if (stop) {
-		throw new Error(msg);
-	}
-	// else ...
-	if (win.console) {
-		console.log(msg); // eslint-disable-line no-console
-	}
-}
+'use strict';
+/* global win, window */
 
-// The Highcharts namespace
-Highcharts = win.Highcharts ? error(16, true) : { win: win };
+// glob is a temporary fix to allow our es-modules to work.
+var glob = typeof win === 'undefined' ? window : win,
+	doc = glob.document,
+	SVG_NS = 'http://www.w3.org/2000/svg',
+	userAgent = (glob.navigator && glob.navigator.userAgent) || '',
+	svg = (
+		doc &&
+		doc.createElementNS &&
+		!!doc.createElementNS(SVG_NS, 'svg').createSVGRect
+	),
+	isMS = /(edge|msie|trident)/i.test(userAgent) && !glob.opera,
+	isFirefox = userAgent.indexOf('Firefox') !== -1,
+	isChrome = userAgent.indexOf('Chrome') !== -1,
+	hasBidiBug = (
+		isFirefox &&
+		parseInt(userAgent.split('Firefox/')[1], 10) < 4 // issue #38
+	);
 
-Highcharts.seriesTypes = seriesTypes;
+var Highcharts = glob.Highcharts ? glob.Highcharts.error(16, true) : {
+	product: '@product.name@',
+	version: '@product.version@',
+	deg2rad: Math.PI * 2 / 360,
+	doc: doc,
+	hasBidiBug: hasBidiBug,
+	hasTouch: doc && doc.documentElement.ontouchstart !== undefined,
+	isMS: isMS,
+	isWebKit: userAgent.indexOf('AppleWebKit') !== -1,
+	isFirefox: isFirefox,
+	isChrome: isChrome,
+	isSafari: !isChrome && userAgent.indexOf('Safari') !== -1,
+	isTouchDevice: /(Mobile|Android|Windows Phone)/.test(userAgent),
+	SVG_NS: SVG_NS,
+	chartCount: 0,
+	seriesTypes: {},
+	symbolSizes: {},
+	svg: svg,
+	win: glob,
+	marginNames: ['plotTop', 'marginRight', 'marginBottom', 'plotLeft'],
+	noop: function () {
+		return undefined;
+	},
+	/**
+	 * An array containing the current chart objects in the page. A chart's
+	 * position in the array is preserved throughout the page's lifetime. When
+	 * a chart is destroyed, the array item becomes `undefined`.
+	 * @type {Array.<Highcharts.Chart>}
+	 * @memberOf Highcharts
+	 */
+	charts: []
+};
+export default Highcharts;

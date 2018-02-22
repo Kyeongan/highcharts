@@ -1,8 +1,43 @@
 <?php
 
+require_once('../issue-by-commit/Git.php');
 require_once('../settings.php');
 define('JQUERY_VERSION', isset($_SESSION['jQueryVersion']) ? $_SESSION['jQueryVersion'] : Settings::$jQueryVersion);
+define('JQUERY_VERSION_OLD_IE', isset($_SESSION['jQueryVersionOldIE']) ? $_SESSION['jQueryVersionOldIE'] : Settings::$jQueryVersionOldIE);
 
+$path = @$_GET['path'];
+if (isset($path) && !preg_match('/^[a-z\-0-9]+\/[a-z0-9\-\.]+\/[a-z0-9\-,]+$/', $path)) {
+    die ('Invalid sample path input: ' . $path);
+}
+
+$fsPath = realpath(dirname(__FILE__) . '/../../samples') . '/' . $path;
+$details = @file_get_contents("$fsPath/demo.details");
+$isUnitTest = file_exists("$fsPath/unit-tests.js") || strstr($details, 'qunit') ? true : false;
+$isManual = (strstr($details, 'requiresManualTesting: true') !== false);
+
+
+function getBranch() {
+
+    try {
+        Git::set_bin(Settings::$git);
+        $repo = Git::open(dirname(__FILE__) . '/../../');
+
+        return $repo->active_branch();
+    } catch (Exception $e) {
+        echo $e->getMessage();
+    }
+        
+}
+
+function compareJSON($browserKey = null) {
+
+    if (!isset($browserKey)) {
+        $browser = getBrowser();
+        $browserKey = isset($browser['parent']) ? $browser['parent'] : 'Unknown';
+    }
+    
+    return 'temp/compare.' . getBranch() . '.' . strtolower($browserKey) . '.json';
+}
 
 /**
  * getBrowser function from http://php.net/manual/en/function.get-browser.php#101125
@@ -29,12 +64,22 @@ function getBrowser() {
     if(preg_match('/MSIE/i',$u_agent) && !preg_match('/Opera/i',$u_agent)) 
     { 
         $bname = 'Internet Explorer'; 
+        $ub = "MSIE";
+    } 
+    elseif(preg_match('/Trident/i',$u_agent)) 
+    { 
+        $bname = 'Internet Explorer'; 
         $ub = "MSIE"; 
     } 
     elseif(preg_match('/Firefox/i',$u_agent)) 
     { 
         $bname = 'Mozilla Firefox'; 
         $ub = "Firefox"; 
+    } 
+    elseif(preg_match('/Edge/i',$u_agent)) 
+    { 
+        $bname = 'Edge'; 
+        $ub = "Edge"; 
     } 
     elseif(preg_match('/Chrome/i',$u_agent)) 
     { 
@@ -79,7 +124,7 @@ function getBrowser() {
             $version= $matches['version'][0];
         }
         else {
-            $version= $matches['version'][1];
+            @$version= $matches['version'][1];
         }
     }
     else {
@@ -95,10 +140,38 @@ function getBrowser() {
         'version'   => $version,
         'platform'  => $platform,
         'pattern'   => $pattern,
-        'parent'    => $bname . ' ' . $version
+        //'parent'    => $bname . ' ' . $version
+        'parent'    => $ub
     );
 } 
 
+/*
+ * When a reference to a graphics file exists in the demo, copy it over to the
+ * local cache so we can see it while working on utils.highcharts.local.
+ */
+function getGraphics(&$s) {
+
+    global $topDomain;
+
+    $gfxRoot = 'https://www.highcharts.com/samples/graphics';
+
+    $src = dirname(__FILE__) . '/../../samples/graphics';
+    $dest = dirname(__FILE__) . '/cache';
+
+    if (strpos($s, $gfxRoot) !== false) {
+        $files = glob("$src/*.*");
+        foreach($files as $file){
+            $file_to_go = str_replace($src, $dest, $file);
+            copy($file, $file_to_go);
+        }
+    }
+
+    $s = str_replace(
+        $gfxRoot,
+        "http://utils.highcharts.$topDomain/samples/cache",
+        $s
+    );
+}
 
 
 function getFramework($framework) {
@@ -146,16 +219,27 @@ function getFramework($framework) {
 
 	} else {
 		$file = '../../lib/jquery-' . JQUERY_VERSION . '.js';
-		if (file_exists($file)) {
-			copy($file, '../draft/jquery-' . JQUERY_VERSION . '.js');
+        if (file_exists($file)) {
+            copy($file, '../draft/jquery-' . JQUERY_VERSION . '.js');
 			return '
+                <!--[if lt IE 9]>
+                <script src="http://code.jquery.com/jquery-' . JQUERY_VERSION_OLD_IE . '.js"></script>
+                <![endif]-->
+                <!--[if gte IE 9]> -->
 				<script src="../draft/jquery-' . JQUERY_VERSION . '.js"></script>
+                <!-- <![endif]-->
 			';
 		} else {
 			return '
+                <!--[if lt IE 9]>
+                <script src="http://code.jquery.com/jquery-' . JQUERY_VERSION_OLD_IE . '.js"></script>
+                <![endif]-->
+                <!--[if gte IE 9]> -->
 				<script src="cache.php?file=http://code.jquery.com/jquery-' . JQUERY_VERSION . '.js"></script>
+                <!-- <![endif]-->
 			';
 		}
 	}
 }
+
 ?>

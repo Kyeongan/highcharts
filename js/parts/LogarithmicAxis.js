@@ -1,4 +1,18 @@
 /**
+ * (c) 2010-2017 Torstein Honsi
+ *
+ * License: www.highcharts.com/license
+ */
+/* eslint max-len: 0 */
+'use strict';
+import H from './Globals.js';
+import './Utilities.js';
+var Axis = H.Axis,
+	getMagnitude = H.getMagnitude,
+	map = H.map,
+	normalizeTickInterval = H.normalizeTickInterval,
+	pick = H.pick;
+/**
  * Methods defined on the Axis prototype
  */
 
@@ -22,13 +36,13 @@ Axis.prototype.getLogTickPositions = function (interval, min, max, minor) {
 
 	// First case: All ticks fall on whole logarithms: 1, 10, 100 etc.
 	if (interval >= 0.5) {
-		interval = mathRound(interval);
+		interval = Math.round(interval);
 		positions = axis.getLinearTickPositions(interval, min, max);
 
 	// Second case: We need intermediary ticks. For example
 	// 1, 2, 4, 6, 8, 10, 20, 40 etc.
 	} else if (interval >= 0.08) {
-		var roundedMin = mathFloor(min),
+		var roundedMin = Math.floor(min),
 			intermediate,
 			i,
 			j,
@@ -49,7 +63,7 @@ Axis.prototype.getLogTickPositions = function (interval, min, max, minor) {
 			len = intermediate.length;
 			for (j = 0; j < len && !break2; j++) {
 				pos = log2lin(lin2log(i) * intermediate[j]);
-				if (pos > min && (!minor || lastPos <= max) && lastPos !== UNDEFINED) { // #1670, lastPos is #3113
+				if (pos > min && (!minor || lastPos <= max) && lastPos !== undefined) { // #1670, lastPos is #3113
 					positions.push(lastPos);
 				}
 
@@ -66,7 +80,9 @@ Axis.prototype.getLogTickPositions = function (interval, min, max, minor) {
 	} else {
 		var realMin = lin2log(min),
 			realMax = lin2log(max),
-			tickIntervalOption = options[minor ? 'minorTickInterval' : 'tickInterval'],
+			tickIntervalOption = minor ? 
+				this.getMinorTickInterval() : 
+				options.tickInterval,
 			filteredTickIntervalOption = tickIntervalOption === 'auto' ? null : tickIntervalOption,
 			tickPixelIntervalOption = options.tickPixelInterval / (minor ? 5 : 1),
 			totalPixelLength = minor ? axisLength / axis.tickPositions.length : axisLength;
@@ -102,9 +118,9 @@ Axis.prototype.getLogTickPositions = function (interval, min, max, minor) {
 };
 
 Axis.prototype.log2lin = function (num) {
-	return math.log(num) / math.LN10;
+	return Math.log(num) / Math.LN10;
 };
 
 Axis.prototype.lin2log = function (num) {
-	return math.pow(10, num);
+	return Math.pow(10, num);
 };

@@ -1,12 +1,13 @@
-$(function () {
 
-    // Get the CSV and create the chart
-    $.getJSON('https://www.highcharts.com/samples/data/jsonp.php?filename=analytics.csv&callback=?', function (csv) {
 
-        $('#container').highcharts({
+// Get the CSV and create the chart
+$.ajax({
+    url: 'https://cdn.rawgit.com/highcharts/highcharts/v6.0.4/samples/data/analytics.csv',
+    success: function (csv) {
+        Highcharts.chart('container', {
 
             data: {
-                csv: csv
+                csv: csv.replace(/\n\n/g, '\n')
             },
 
             title: {
@@ -58,8 +59,6 @@ $(function () {
             legend: {
                 align: 'left',
                 verticalAlign: 'top',
-                y: 20,
-                floating: true,
                 borderWidth: 0
             },
 
@@ -103,6 +102,5 @@ $(function () {
                 name: 'New visitors'
             }]
         });
-    });
-
+    }
 });

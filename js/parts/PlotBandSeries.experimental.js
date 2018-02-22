@@ -1,42 +1,38 @@
+/**
+ * (c) 2010-2017 Torstein Honsi
+ *
+ * License: www.highcharts.com/license
+ */
 /* ****************************************************************************
  * Start PlotBand series code											      *
  *****************************************************************************/
 /**
  * This is an experiment of implementing plotBands and plotLines as a series.
- * It could solve problems with export, updating etc., add tooltip and mouse events,
- * and provide a more compact and consistent implementation.
+ * It could solve problems with export, updating etc., add tooltip and mouse
+ * events, and provide a more compact and consistent implementation.
  * Demo: http://jsfiddle.net/highcharts/5Rbf6/
  */
-
-(function (H) {
-
-var seriesTypes = H.seriesTypes,
-	merge = H.merge,
-	defaultPlotOptions = H.getOptions().plotOptions,
-	extendClass = H.extendClass,
+'use strict';
+import H from './Globals.js';
+import './Utilities.js';
+import './Series.js';
+import './Options.js';
+var seriesType = H.seriesType,
 	each = H.each,
 	Series = H.Series;
 
-// 1 - set default options
-defaultPlotOptions.plotband = merge(defaultPlotOptions.column, {
+seriesType('plotband', 'column', {
 	lineWidth: 0,
-	//onXAxis: false,
 	threshold: null
-});
-
-// 2 - Create the CandlestickSeries object
-seriesTypes.plotband = extendClass(seriesTypes.column, {
-	type: 'plotband',
-
-	/**
-	 * One-to-one mapping from options to SVG attributes
-	 */
-	pointAttrToOptions: { // mapping between SVG attributes and the corresponding options
+}, {
+	/*= if (build.classic) { =*/
+	// mapping between SVG attributes and the corresponding options
+	pointAttrToOptions: { 
 		fill: 'color',
 		stroke: 'lineColor',
 		'stroke-width': 'lineWidth'
 	},
-
+	/*= } =*/
 	animate: function () {},
 
 	translate: function () {
@@ -69,20 +65,10 @@ seriesTypes.plotband = extendClass(seriesTypes.column, {
 				height: width
 			};
 		});
-	},
-
-	/**
-	 * Draw the data points
-	 */
-	_drawPoints: function () {
-
 	}
 
 
 });
-
-}(Highcharts));
-
 /* ****************************************************************************
  * End PlotBand series code												      *
  *****************************************************************************/

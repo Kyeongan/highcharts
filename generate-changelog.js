@@ -6,6 +6,7 @@
  * generates a draft for a changelog.
  *
  * Parameters
+ * --since String The tag to start from
  * --after String The start date.
  * --before String Optional. The end date for the changelog, defaults to today.
  */
@@ -14,7 +15,8 @@
     'use strict';
 
     var fs = require('fs'),
-        cmd = require('child_process');
+        cmd = require('child_process'),
+        tree = require('./tree.json');
 
     var params;
 
@@ -44,9 +46,16 @@
             callback(stdout);
         }
 
-        command = 'git log --after={' + params.after + '} --format="%s<br>" ';
-        if (params.before) {
-            command += '--before={' + params.before + '} ';
+        command = 'git log --format="%s<br>" ';
+        if (params.since) {
+            command += ' ' + params.since + '..HEAD ';
+        } else {
+            if (params.after) {
+                command += '--after={' + params.after + '} ';
+            }
+            if (params.before) {
+                command += '--before={' + params.before + '} ';
+            }
         }
 
         cmd.exec(command, null, puts);
@@ -63,7 +72,8 @@
         log.forEach(function (item) {
 
             // Keep only the commits after the last release
-            if (proceed && (new RegExp('official release ---$')).test(item)) {
+            if (proceed && (new RegExp('official release ---$')).test(item) &&
+                    !params.since) {
                 proceed = false;
             }
 
@@ -83,7 +93,7 @@
         });
 
         // Last release not found, abort
-        if (proceed === true) {
+        if (proceed === true && !params.since) {
             throw 'Last release not located, try setting an older start date.';
         }
 
@@ -110,7 +120,7 @@
     /**
      * Build the output
      */
-    function buildHTML(name, version, date, log, products) {
+    function buildHTML(name, version, date, log, products, optionKeys) {
         var s,
             filename = 'changelog-' + name.toLowerCase() + '.htm';
 
@@ -136,11 +146,48 @@
 
         log.forEach((li, i) => {
 
-            // Hyperlinked issue numbers
-            li = li.replace(
-                /#([0-9]+)/g,
-                '<a href="https://github.com/highslide-software/highcharts.com/issues/$1">#$1</a>'
-            );
+            optionKeys.forEach(key => {
+                let replacement = ` <a href="https://api.highcharts.com/${name.toLowerCase()}/${key}">${key}</a> `;
+                li = li
+                    .replace(
+                        ` \`${key}\` `,
+                        replacement
+                    )
+                    .replace(
+                        ` ${key} `,
+                        replacement
+                    );
+
+                // We often refer to series options without the plotOptions
+                // parent, so make sure it is auto linked too.
+                if (key.indexOf('plotOptions.') === 0) {
+                    let shortKey = key.replace('plotOptions.', '');
+                    if (shortKey.indexOf('.') !== -1) {
+                        li = li
+                            .replace(
+                                ` \`${shortKey}\` `,
+                                replacement
+                            )
+                            .replace(
+                                ` ${shortKey} `,
+                                replacement
+                            );
+                    }
+                }
+            });
+
+            li = li
+
+                // Hyperlinked issue numbers
+                .replace(
+                    /#([0-9]+)/g,
+                    '<a href="https://github.com/highslide-software/highcharts.com/issues/$1">#$1</a>'
+                )
+                // Code tags
+                .replace(
+                    /`([^`]+)`/g,
+                    '<code>$1</code>'
+                );
 
             // Start fixes
             if (i === log.startFixes) {
@@ -190,6 +237,30 @@
         });
     }
 
+    /*
+     * Return a list of options so that we can auto-link option references in
+     * the changelog.
+     */
+    function getOptionKeys(treeroot) {
+        let keys = [];
+        function recurse(subtree, path) {
+            Object.keys(subtree).forEach(key => {
+                if (path + key !== '') {
+                    // Push only the second level, we don't want auto linking of
+                    // general words like chart, series, legend, tooltip etc.
+                    if (path.indexOf('.') !== -1) {
+                        keys.push(path + key);
+                    }
+                    if (subtree[key].children) {
+                        recurse(subtree[key].children, `${path}${key}.`);
+                    }
+                }
+            });
+        }
+        recurse(treeroot, '');
+        return keys;
+    }
+
     params = getParams();
 
 
@@ -199,6 +270,8 @@
         // Split the log into an array
         log = log.split('<br>\n');
         log.pop();
+
+        const optionKeys = getOptionKeys(tree);
 
         // Load the current products and versions, and create one log each
         fs.readFile('build/dist/products.js', 'utf8', function (err, products) {
@@ -215,7 +288,7 @@
 
             for (name in products) {
                 if (products.hasOwnProperty(name)) {
-                    buildHTML(name, products[name].nr, products[name].date, log, products);
+                    buildHTML(name, products[name].nr, products[name].date, log, products, optionKeys);
                 }
             }
         });

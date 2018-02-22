@@ -1,43 +1,42 @@
-$(function () {
-    $('#container').highcharts({
 
-        chart: {
-            type: 'bubble'
-        },
+var chart = Highcharts.chart('container', {
 
-        title: {
-            text: 'Size by absolute value'
-        },
+    chart: {
+        type: 'bubble'
+    },
 
-        subtitle: {
-            text: 'Size is computed by absolute value on negative bubbles'
-        },
+    title: {
+        text: 'Size by absolute value'
+    },
 
-        series: [{
-            data: [
-                [-5, 0, -5],
-                [-4, 0, -4],
-                [-3, 0, -3],
-                [-2, 0, -2],
-                [-1, 0, -1],
-                [0, 0, 0],
-                [1, 0, 1],
-                [2, 0, 2],
-                [3, 0, 3],
-                [4, 0, 4],
-                [5, 0, 5]
-            ],
-            sizeByAbsoluteValue: true,
-            negativeColor: '#FF0000'
-        }]
+    subtitle: {
+        text: 'Size is computed by absolute value on negative bubbles'
+    },
 
-    });
+    series: [{
+        data: [
+            [-5, 0, -5],
+            [-4, 0, -4],
+            [-3, 0, -3],
+            [-2, 0, -2],
+            [-1, 0, -1],
+            [0, 0, 0],
+            [1, 0, 1],
+            [2, 0, 2],
+            [3, 0, 3],
+            [4, 0, 4],
+            [5, 0, 5]
+        ],
+        sizeByAbsoluteValue: true,
+        negativeColor: '#FF0000'
+    }]
+
+});
 
 
-    // Add the slider to view changes
-    $('input#zthreshold').bind('input', function () {
-        $('#container').highcharts().series[0].update({
-            zThreshold: parseInt(this.value, 10)
-        });
+// Add the slider to view changes
+$('input#zthreshold').on('input', function () {
+    chart.series[0].update({
+        zThreshold: parseInt(this.value, 10)
     });
 });

@@ -1,19 +1,18 @@
-$(function () {
-    $('#container').highcharts('StockChart', {
 
-        xAxis: {
-            crosshair: {
-                dashStyle: 'dash'
-            }
-        },
+Highcharts.stockChart('container', {
 
-        rangeSelector: {
-            selected: 1
-        },
+    xAxis: {
+        crosshair: {
+            dashStyle: 'dash'
+        }
+    },
 
-        series: [{
-            name: 'USD to EUR',
-            data: usdeur
-        }]
-    });
+    rangeSelector: {
+        selected: 1
+    },
+
+    series: [{
+        name: 'USD to EUR',
+        data: usdeur
+    }]
 });

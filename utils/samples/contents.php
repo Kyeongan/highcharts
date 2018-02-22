@@ -5,7 +5,7 @@ require_once('functions.php');
 $browser = getBrowser();
 $browserKey = isset($_GET['browserKey']) ? $_GET['browserKey'] : $browser['parent'];
 
-$compare = @json_decode(file_get_contents('temp/compare.json'));
+$compare = @json_decode(file_get_contents(compareJSON()));
 
 
 ?><!DOCTYPE HTML>
@@ -22,25 +22,32 @@ $compare = @json_decode(file_get_contents('temp/compare.json'));
 		<link href="http://netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css" rel="stylesheet">
 		
 		<script>
+			/* eslint-disable */
+			var controller = window.parent && window.parent.controller;
+
 			var diffThreshold = 0;
 			window.continueBatch = false;
+
+			function batchMode() {
+				window.continueBatch = true;
+				$('#batch-compare').hide();
+				$('#batch-stop').show();
+			}
 			function runBatch() {
 				var currentLi = document.currentLi || $('#li1')[0];
 				if (currentLi) {
 					var href = currentLi.getElementsByTagName("a")[0].href;
-					window.continueBatch = true;
 				
-					href = href.replace("view.php", "compare-view.php");
+					href = href.replace("/view.php", "/compare-view.php");
 					window.parent.frames[1].location.href = href;
 				}
-				$(this).toggle();
-				$('#batch-stop').toggle();
+				batchMode();
 			}
 
 			function stopBatch() {
 				window.continueBatch = false;
-				$('#batch-stop').toggle();
-				$('#batch-compare').toggle();
+				$('#batch-stop').hide();
+				$('#batch-compare').show();
 			}
 
 			function countFails() {
@@ -58,6 +65,23 @@ $compare = @json_decode(file_get_contents('temp/compare.json'));
 					}
 				});
 
+				$('.manual-checkbox').click(function () {
+					var path = this.id.replace(/^checkbox-/, ''),
+						$li = $(this).parent(),
+						diff = this.checked ? 0 : 1;
+
+					if (this.checked) {
+						$li.removeClass('different').addClass('identical');
+					} else {
+						$li.removeClass('identical').addClass('different');
+					}
+
+					$.get('compare-update-report.php', {
+						path: path,
+						diff: diff
+					});
+				});
+
 				
 				$("#batch-compare").click(runBatch);
 				$("#batch-stop").click(stopBatch);
@@ -72,6 +96,7 @@ $compare = @json_decode(file_get_contents('temp/compare.json'));
 					window.location.reload();
 				});
 
+				/*
 				var fails = 0;
 				$('#fails-only').click(function () {
 
@@ -90,6 +115,7 @@ $compare = @json_decode(file_get_contents('temp/compare.json'));
 
 					
 				});
+
 
 				$("#slider").slider({
 					min: 0,
@@ -111,10 +137,11 @@ $compare = @json_decode(file_get_contents('temp/compare.json'));
 						});
 					}
 				});
+				*/
 
 				$('#main-nav').css('margin-top', $('#top-nav').height());
 
-				countFails();
+				//countFails();
 				
 			});
 			
@@ -263,20 +290,27 @@ $compare = @json_decode(file_get_contents('temp/compare.json'));
 			Settings
 		</a>
 
+		<!--
 		<a class="button" id="fails-only" title="Show only fails">
 			<i class="icon-filter"></i>
 			Fails only
 			<span id="count-fails"></span>
 		</a>
+		-->
 
-		<div class="text">
-			View results for <a href="?"><?php echo $browser['name'] ?></a>, <a href="?browserKey=PhantomJS 2.1.1">PhantomJS</a>
+		<div class="text" id="test-status">
 		</div>
 
+		<div class="text">
+			View results for <a href="?"><?php echo $browser['name'] ?></a>, <a href="?browserKey=Safari">Safari</a>, <a href="?browserKey=PhantomJS">PhantomJS</a>
+		</div>
+
+		<!--
 		<div style="margin-top: 1em">
 			<div style="width: 45%; float:left">Diff limit: <span id="slider-value">0</span></div>
 			<div id="slider" style="width: 45%; float:left"></div>
 		</div>
+		-->
 
 	</div>
 
@@ -289,126 +323,168 @@ $compare = @json_decode(file_get_contents('temp/compare.json'));
 	<?php
 	$products = array('highcharts', 'maps', 'stock', 'unit-tests', 'issues', 'cloud');
 	$samplesDir = dirname(__FILE__). '/../../samples/';
+	$testStatus = array(
+		'success' => array(),
+		'error' => array()
+	);
+
+	$html = "";
+	$samples = array('');
 	
 
 	$i = 1;
 	foreach ($products as $dir) {
-		if ($handle = opendir($samplesDir . $dir)) {
 
-			echo "<h2>$dir</h2>";
+		$html .= "<h2>$dir</h2>";
+		
+		$files = scandir($samplesDir . $dir);
+		//while (false !== ($file = readdir($handle))) {
+		foreach($files as $file) {
+
+			if (is_dir("$samplesDir/$dir/$file") && substr($file, 0, 1) != '.') {
+				$html .= "
+				<h4>$dir/$file</h4>
+				<ul>
+				";
 			
-			while (false !== ($file = readdir($handle))) {
-				if (is_dir("$samplesDir/$dir/$file") && substr($file, 0, 1) != '.') {
-					echo "
-					<h4>$dir/$file</h4>
-					<ul>
-					";
-				
-					// loop over the inner directories
-					if ($innerHandle = opendir($samplesDir . $dir . '/'. $file)) {
-						while (false !== ($innerFile = readdir($innerHandle))) {
-							$next = $i + 1;
-							$batchClass = 'batch';
-							$compareClass = '';
-							if (preg_match('/^[a-z0-9\-,]+$/', $innerFile)) {
-								$yaml = @file_get_contents(($samplesDir ."/$dir/$file/$innerFile/demo.details"));
-								$path = "$dir/$file/$innerFile";
-								$suffix = '';
-								$dissIndex = '';
-								$isUnitTest = strstr($yaml, 'qunit') || file_exists($samplesDir ."/$dir/$file/$innerFile/unit-tests.js");
-								$diff = '';
+				// loop over the inner directories
+				$innerFiles = scandir($samplesDir . $dir . '/'. $file);
+				foreach($innerFiles as $innerFile) {
+					$batchClass = 'batch';
+					$compareClass = '';
+					$isManual = false;
+					if (preg_match('/^[a-z0-9\-,]+$/', $innerFile)) {
+						$yaml = @file_get_contents(($samplesDir ."/$dir/$file/$innerFile/demo.details"));
+						$path = "$dir/$file/$innerFile";
+						$suffix = '';
+						$dissIndex = '';
+						$isUnitTest = strstr($yaml, 'qunit') || file_exists($samplesDir ."/$dir/$file/$innerFile/unit-tests.js");
+						$diff = '';
 
+						if (strstr($yaml, 'requiresManualTesting: true')) {
+							$batchClass = '';
+							$compareClass = 'manual';
+							$isManual = true;
+						}
 
-								if (strstr($yaml, 'requiresManualTesting: true')) {
-									$batchClass = '';
-									$compareClass = 'manual';
-								}
+						// Display diff from previous comparison
+						$compareIcon = $isUnitTest ? 'icon-puzzle-piece' : 'icon-columns';
+						$dissIndex = "
+							<a class='dissimilarity-index' href='compare-view.php?path=$path' target='main'>
+								<i class='$compareIcon'></i></a>
+						";
 
-								// Display diff from previous comparison
-								$compareIcon = $isUnitTest ? 'icon-puzzle-piece' : 'icon-columns';
-								$dissIndex = "
-									<a class='dissimilarity-index' href='compare-view.php?path=$path&amp;i=$i' target='main'>
-										<i class='$compareIcon'></i></a>
-								";
-								if (isset($compare->$path->$browserKey)) {
-									$diff = $compare->$path->$browserKey;
-									if (!preg_match('/^[0-9\\.]+$/', $diff) || $diff > 0) {
-										if (strstr($diff, '.')) {
-											$diff = round($diff, 2);
-										}
-										$compareClass = 'different';
-										$dummy = mktime();
-										$dissIndex = "
-											<a class='dissimilarity-index' href='compare-view.php?path=$path&amp;i=$i&amp;dummy=$dummy'
-												target='main' data-diff='$diff'>$diff</a>
-										";
-									} else {
-										$compareClass = 'identical';
-									}
-								}
-
-								// No symbol for manual tests
-								if ($compareClass == 'manual') {
-									$dissIndex = "
-										<a title='Requires manual testing' class='dissimilarity-index' href='compare-view.php?path=$path&amp;i=$i' target='main'>
-											<i class='icon-hand-left'></i>
-										</a>
-									";
-								}
-
-								// Comments
-								if (isset($compare->$path->comment)) {
-									$comment = $compare->$path->comment;
-									
-									// Sample is different but approved
-									if ($comment->symbol === 'check' && $comment->diff == $diff) {
-										$compareClass = 'approved';
-									} else if ($comment->symbol === 'exclamation-sign') {
-										$compareClass = 'different';
-									}
-									
-									// Make it string
-									$comment = "
-										<i class='icon-$comment->symbol' title='$comment->title'></i>
-										<span class='comment-title'>$comment->title<br>(Approved diff: $comment->diff)</span>
-									";
-									
-								} else {
-									$comment = "
-										<i class='icon-pencil' title='Add comment'></i>
-									";
-								}
-
-								echo "
-								<li id='li$i' class='$compareClass'>$i. $suffix 
-									<a target='main' id='i$i' class='$batchClass' href='view.php?path=$path&amp;i=$i'>$innerFile</a>
-									<a class='comment' href='compare-comment.php?path=$path&amp;i=$i&amp;diff=$diff' target='main'>
-										$comment
-									</a>
-									$dissIndex
-								</li>
-								";
-								$i++;
-							
-							} elseif (preg_match('/^[a-zA-Z0-9\-,]+$/', $innerFile)) {
-								echo "
-								<li class='different'>
-									Invalid sample name, use lower case only:<br>$innerFile
-								</li>
-								";
+						// Handle browser keys for inspecting results from other browsers
+						if (@$compare->$path) {
+							foreach($compare->$path as $key => $value) {
+								$diff = @$compare->$path->diff;
 							}
 						}
+						if ($diff !== '') {
+							if (!preg_match('/^[0-9\\.]+$/', $diff) || $diff > 0) {
+								if (strstr($diff, '.')) {
+									$diff = round($diff, 2);
+								}
+								$compareClass = 'different';
+								$dissIndex = "
+									<a class='dissimilarity-index' href='compare-view.php?path=$path&amp;dummy=" . time() . "'
+										target='main' data-diff='$diff'>$diff</a>
+								";
+							} else {
+								$compareClass = 'identical';
+							}
+						}
+
+						// No symbol for manual tests
+						if ($isManual) {
+							$checked = $diff == '0' ? 'checked' : '';
+							$dissIndex = "
+								<input type='checkbox' class='dissimilarity-index manual-checkbox'
+									id='checkbox-$path' $checked />
+							";
+						}
+
+						// Comments
+						if (isset($compare->$path->comment)) {
+							$comment = $compare->$path->comment;
+							
+							// Sample is different but approved
+							if ($comment->symbol === 'check' && $comment->diff == $diff) {
+								$compareClass = 'approved';
+							} else if ($comment->symbol === 'exclamation-sign') {
+								$compareClass = 'different';
+							}
+
+							// Make it string
+							$comment = "
+								<i class='icon-$comment->symbol' title='$comment->title'></i>
+								<span class='comment-title'>$comment->title<br>(Approved diff: $comment->diff)</span>
+							";
+							
+						} else {
+							$comment = "
+								<i class='icon-pencil' title='Add comment'></i>
+							";
+						}
+
+						$mainLink = $isUnitTest ?
+							"compare-view.php?path=$path&amp;dummy=" . time() :
+							"view.php?path=$path";
+
+						$html .= "
+						<li id='li$i' class='$compareClass'>$i. $suffix 
+							<a target='main' id='i$i' class='$batchClass' href='$mainLink'>$innerFile</a>
+							<a class='comment' href='compare-comment.php?path=$path&amp;diff=$diff' target='main'>
+								$comment
+							</a>
+							$dissIndex
+						</li>
+						";
+
+						$samples[$i] = $path;
+						$i++;
+					
+					} elseif (preg_match('/^[a-zA-Z0-9\-,]+$/', $innerFile)) {
+						$compareClass = 'different';
+						$html .= "
+						<li class='$compareClass'>
+							Invalid sample name, use lower case only:<br>$innerFile
+						</li>
+						";
 					}
-				
-					echo "</ul>";
+
+					if ($compareClass === 'identical') {
+						$testStatus['success'][] = $path;
+					} else if ($compareClass === 'different') {
+						$testStatus['error'][] = $path;
+					}
 				}
+			
+				$html .= "</ul>";
 			}
-		
-		
-			closedir($handle);
 		}
 	}
+
+	echo $html;
+
+	$samplesJS = sizeof($samples) > 0 ?
+		"'" . join("', '", $samples) . "'":
+		'';
+	$testStatusSuccessJS = sizeof($testStatus['success']) > 0 ?
+		"'" . join("', '", $testStatus['success']) . "'":
+		'';
+	$testStatusErrorJS = sizeof($testStatus['error']) > 0 ?
+		"'" . join("', '", $testStatus['error']) . "'":
+		'';
 ?>
 </div>
+
+<script>
+var samples = [<?php echo $samplesJS; ?>];
+controller.testStatus.success = [<?php echo $testStatusSuccessJS  ?>];
+controller.testStatus.error = [<?php echo $testStatusErrorJS  ?>];
+controller.testStatus.total = samples.length;
+controller.updateStatus();
+</script>
 </body>
 </html>

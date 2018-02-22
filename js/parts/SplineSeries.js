@@ -1,19 +1,46 @@
 /**
- * Set the default options for spline
+ * (c) 2010-2017 Torstein Honsi
+ *
+ * License: www.highcharts.com/license
  */
-defaultPlotOptions.spline = merge(defaultSeriesOptions);
+'use strict';
+import H from './Globals.js';
+import './Utilities.js';
+import './Options.js';
+import './Series.js';
+var pick = H.pick,
+	seriesType = H.seriesType;
 
 /**
- * SplineSeries object
+ * A spline series is a special type of line series, where the segments between
+ * the data points are smoothed.
+ *
+ * @sample    {highcharts} highcharts/demo/spline-irregular-time/
+ *            Spline chart
+ * @sample    {highstock} stock/demo/spline/
+ *            Spline chart
+ * @extends   plotOptions.series
+ * @excluding step
+ * @product   highcharts highstock
+ * @apioption plotOptions.spline
  */
-var SplineSeries = extendClass(Series, {
-	type: 'spline',
 
+/**
+ * Spline series type.
+ *
+ * @constructor seriesTypes.spline
+ * @extends     {Series}
+ */
+seriesType('spline', 'line', {}, /** @lends seriesTypes.spline.prototype */ {
 	/**
-	 * Get the spline segment from a given point's previous neighbour to the given point
+	 * Get the spline segment from a given point's previous neighbour to the
+	 * given point
 	 */
 	getPointSpline: function (points, point, i) {
-		var smoothing = 1.5, // 1 means control points midway between points, 2 means 1/3 from the point, 3 is 1/4 etc
+		var 
+			// 1 means control points midway between points, 2 means 1/3 from
+			// the point, 3 is 1/4 etc
+			smoothing = 1.5,
 			denom = smoothing + 1,
 			plotX = point.plotX,
 			plotY = point.plotY,
@@ -26,7 +53,10 @@ var SplineSeries = extendClass(Series, {
 			ret;
 
 		function doCurve(otherPoint) {
-			return otherPoint && !otherPoint.isNull && otherPoint.doCurve !== false;
+			return otherPoint &&
+				!otherPoint.isNull &&
+				otherPoint.doCurve !== false &&
+				!point.isCliff; // #6387, area splines next to null
 		}
 
 		// Find control points
@@ -42,7 +72,8 @@ var SplineSeries = extendClass(Series, {
 			rightContX = (smoothing * plotX + nextX) / denom;
 			rightContY = (smoothing * plotY + nextY) / denom;
 
-			// Have the two control points make a straight line through main point
+			// Have the two control points make a straight line through main
+			// point
 			if (rightContX !== leftContX) { // #5016, division by zero
 				correction = ((rightContY - leftContY) * (rightContX - plotX)) /
 					(rightContX - leftContX) + plotY - rightContY;
@@ -54,17 +85,18 @@ var SplineSeries = extendClass(Series, {
 			// to prevent false extremes, check that control points are between
 			// neighbouring points' y values
 			if (leftContY > lastY && leftContY > plotY) {
-				leftContY = mathMax(lastY, plotY);
-				rightContY = 2 * plotY - leftContY; // mirror of left control point
+				leftContY = Math.max(lastY, plotY);
+				// mirror of left control point
+				rightContY = 2 * plotY - leftContY;
 			} else if (leftContY < lastY && leftContY < plotY) {
-				leftContY = mathMin(lastY, plotY);
+				leftContY = Math.min(lastY, plotY);
 				rightContY = 2 * plotY - leftContY;
 			}
 			if (rightContY > nextY && rightContY > plotY) {
-				rightContY = mathMax(nextY, plotY);
+				rightContY = Math.max(nextY, plotY);
 				leftContY = 2 * plotY - rightContY;
 			} else if (rightContY < nextY && rightContY < plotY) {
-				rightContY = mathMin(nextY, plotY);
+				rightContY = Math.min(nextY, plotY);
 				leftContY = 2 * plotY - rightContY;
 			}
 
@@ -78,7 +110,11 @@ var SplineSeries = extendClass(Series, {
 		// Visualize control points for debugging
 		/*
 		if (leftContX) {
-			this.chart.renderer.circle(leftContX + this.chart.plotLeft, leftContY + this.chart.plotTop, 2)
+			this.chart.renderer.circle(
+					leftContX + this.chart.plotLeft,
+					leftContY + this.chart.plotTop,
+					2
+				)
 				.attr({
 					stroke: 'red',
 					'stroke-width': 2,
@@ -86,7 +122,8 @@ var SplineSeries = extendClass(Series, {
 					zIndex: 9
 				})
 				.add();
-			this.chart.renderer.path(['M', leftContX + this.chart.plotLeft, leftContY + this.chart.plotTop,
+			this.chart.renderer.path(['M', leftContX + this.chart.plotLeft,
+				leftContY + this.chart.plotTop,
 				'L', plotX + this.chart.plotLeft, plotY + this.chart.plotTop])
 				.attr({
 					stroke: 'red',
@@ -96,7 +133,11 @@ var SplineSeries = extendClass(Series, {
 				.add();
 		}
 		if (rightContX) {
-			this.chart.renderer.circle(rightContX + this.chart.plotLeft, rightContY + this.chart.plotTop, 2)
+			this.chart.renderer.circle(
+					rightContX + this.chart.plotLeft,
+					rightContY + this.chart.plotTop,
+					2
+				)
 				.attr({
 					stroke: 'green',
 					'stroke-width': 2,
@@ -104,7 +145,8 @@ var SplineSeries = extendClass(Series, {
 					zIndex: 9
 				})
 				.add();
-			this.chart.renderer.path(['M', rightContX + this.chart.plotLeft, rightContY + this.chart.plotTop,
+			this.chart.renderer.path(['M', rightContX + this.chart.plotLeft,
+				rightContY + this.chart.plotTop,
 				'L', plotX + this.chart.plotLeft, plotY + this.chart.plotTop])
 				.attr({
 					stroke: 'green',
@@ -123,9 +165,85 @@ var SplineSeries = extendClass(Series, {
 			plotX,
 			plotY
 		];
-		lastPoint.rightContX = lastPoint.rightContY = null; // reset for updating series later
+		// reset for updating series later
+		lastPoint.rightContX = lastPoint.rightContY = null;
 		return ret;
 	}
 });
-seriesTypes.spline = SplineSeries;
 
+/**
+ * A `spline` series. If the [type](#series.spline.type) option is
+ * not specified, it is inherited from [chart.type](#chart.type).
+ * 
+ * For options that apply to multiple series, it is recommended to add
+ * them to the [plotOptions.series](#plotOptions.series) options structure.
+ * To apply to all series of this specific type, apply it to [plotOptions.
+ * spline](#plotOptions.spline).
+ * 
+ * @type      {Object}
+ * @extends   series,plotOptions.spline
+ * @excluding dataParser,dataURL,step
+ * @product   highcharts highstock
+ * @apioption series.spline
+ */
+
+/**
+ * An array of data points for the series. For the `spline` series type,
+ * points can be given in the following ways:
+ * 
+ * 1.  An array of numerical values. In this case, the numerical values
+ * will be interpreted as `y` options. The `x` values will be automatically
+ * calculated, either starting at 0 and incremented by 1, or from `pointStart`
+ * and `pointInterval` given in the series options. If the axis has
+ * categories, these will be used. Example:
+ * 
+ *  ```js
+ *  data: [0, 5, 3, 5]
+ *  ```
+ * 
+ * 2.  An array of arrays with 2 values. In this case, the values correspond
+ * to `x,y`. If the first value is a string, it is applied as the name
+ * of the point, and the `x` value is inferred.
+ * 
+ *  ```js
+ *     data: [
+ *         [0, 9],
+ *         [1, 2],
+ *         [2, 8]
+ *     ]
+ *  ```
+ * 
+ * 3.  An array of objects with named values. The objects are point
+ * configuration objects as seen below. If the total number of data
+ * points exceeds the series' [turboThreshold](#series.spline.turboThreshold),
+ * this option is not available.
+ * 
+ *  ```js
+ *     data: [{
+ *         x: 1,
+ *         y: 9,
+ *         name: "Point2",
+ *         color: "#00FF00"
+ *     }, {
+ *         x: 1,
+ *         y: 0,
+ *         name: "Point1",
+ *         color: "#FF00FF"
+ *     }]
+ *  ```
+ * 
+ * @type      {Array<Object|Array|Number>}
+ * @extends   series.line.data
+ * @sample    {highcharts} highcharts/chart/reflow-true/
+ *            Numerical values
+ * @sample    {highcharts} highcharts/series/data-array-of-arrays/
+ *            Arrays of numeric x and y
+ * @sample    {highcharts} highcharts/series/data-array-of-arrays-datetime/
+ *            Arrays of datetime x and y
+ * @sample    {highcharts} highcharts/series/data-array-of-name-value/
+ *            Arrays of point.name and y
+ * @sample    {highcharts} highcharts/series/data-array-of-objects/
+ *            Config objects
+ * @product   highcharts highstock
+ * @apioption series.spline.data
+ */

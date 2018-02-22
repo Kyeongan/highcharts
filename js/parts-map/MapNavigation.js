@@ -1,3 +1,21 @@
+/**
+ * (c) 2010-2017 Torstein Honsi
+ *
+ * License: www.highcharts.com/license
+ */
+'use strict';
+import H from '../parts/Globals.js';
+import '../parts/Utilities.js';
+import '../parts/Chart.js';
+var addEvent = H.addEvent,
+	Chart = H.Chart,
+	doc = H.doc,
+	each = H.each,
+	extend = H.extend,
+	merge = H.merge,
+	pick = H.pick,
+	wrap = H.wrap;
+
 function stopEvent(e) {
 	if (e) {
 		if (e.preventDefault) {
@@ -10,69 +28,176 @@ function stopEvent(e) {
 	}
 }
 
-// Add events to the Chart object itself
-extend(Chart.prototype, {
-	renderMapNavigation: function () {
-		var chart = this,
-			options = this.options.mapNavigation,
-			buttons = options.buttons,
-			n,
-			button,
-			buttonOptions,
-			attr,
-			states,			
-			outerHandler = function (e) {
-				this.handler.call(chart, e);
-				stopEvent(e); // Stop default click event (#4444)
-			};
+/**
+ * The MapNavigation handles buttons for navigation in addition to mousewheel
+ * and doubleclick handlers for chart zooming.
+ * @param {Chart} chart The Chart instance.
+ */
+function MapNavigation(chart) {
+	this.init(chart);
+}
 
-		if (pick(options.enableButtons, options.enabled) && !chart.renderer.forExport) {
-			chart.mapNavButtons = [];
-			for (n in buttons) {
-				if (buttons.hasOwnProperty(n)) {
-					buttonOptions = merge(options.buttonOptions, buttons[n]);
-					attr = buttonOptions.theme;
-					attr.style = merge(buttonOptions.theme.style, buttonOptions.style); // #3203
-					states = attr.states;
-					button = chart.renderer.button(
-							buttonOptions.text,
-							0,
-							0,
-							outerHandler,
-							attr,
-							states && states.hover,
-							states && states.select,
-							0,
-							n === 'zoomIn' ? 'topbutton' : 'bottombutton'
-						)
-						.attr({
-							width: buttonOptions.width,
-							height: buttonOptions.height,
-							title: chart.options.lang[n],
-							zIndex: 5
-						})
-						.add();
-					button.handler = buttonOptions.onclick;
-					button.align(extend(buttonOptions, { width: button.width, height: 2 * button.height }), null, buttonOptions.alignTo);
-					addEvent(button.element, 'dblclick', stopEvent); // Stop double click event (#4444)
-					chart.mapNavButtons.push(button);
-				}
+/**
+ * Initiator function.
+ * @param  {Chart} chart The Chart instance.
+ */
+MapNavigation.prototype.init = function (chart) {
+	this.chart = chart;
+	chart.mapNavButtons = [];
+};
+
+/**
+ * Update the map navigation with new options. Calling this is the same as 
+ * calling `chart.update({ mapNavigation: {} })`. 
+ * @param  {Object} options New options for the map navigation.
+ */
+MapNavigation.prototype.update = function (options) {
+	var chart = this.chart,
+		o = chart.options.mapNavigation,
+		buttonOptions,
+		attr,
+		states,
+		hoverStates,
+		selectStates,
+		outerHandler = function (e) {
+			this.handler.call(chart, e);
+			stopEvent(e); // Stop default click event (#4444)
+		},
+		mapNavButtons = chart.mapNavButtons;
+
+	// Merge in new options in case of update, and register back to chart
+	// options.
+	if (options) {
+		o = chart.options.mapNavigation = 
+			merge(chart.options.mapNavigation, options);
+	}
+
+	// Destroy buttons in case of dynamic update
+	while (mapNavButtons.length) {
+		mapNavButtons.pop().destroy();
+	}
+	
+	if (pick(o.enableButtons, o.enabled) && !chart.renderer.forExport) {
+
+		H.objectEach(o.buttons, function (button, n) {
+			buttonOptions = merge(o.buttonOptions, button);
+			
+			/*= if (build.classic) { =*/
+			// Presentational
+			attr = buttonOptions.theme;
+			attr.style = merge(
+				buttonOptions.theme.style,
+				buttonOptions.style // #3203
+			);
+			states = attr.states;
+			hoverStates = states && states.hover;
+			selectStates = states && states.select;
+			/*= } =*/
+			
+			button = chart.renderer.button(
+				buttonOptions.text,
+				0,
+				0,
+				outerHandler,
+				attr,
+				hoverStates,
+				selectStates,
+				0,
+				n === 'zoomIn' ? 'topbutton' : 'bottombutton'
+			)
+			.addClass('highcharts-map-navigation')
+			.attr({
+				width: buttonOptions.width,
+				height: buttonOptions.height,
+				title: chart.options.lang[n],
+				padding: buttonOptions.padding,
+				zIndex: 5
+			})
+			.add();
+			button.handler = buttonOptions.onclick;
+			button.align(
+				extend(buttonOptions, {
+					width: button.width,
+					height: 2 * button.height
+				}),
+				null,
+				buttonOptions.alignTo
+			);
+			// Stop double click event (#4444)
+			addEvent(button.element, 'dblclick', stopEvent); 
+			
+			mapNavButtons.push(button);
+			
+		});
+	}
+
+	this.updateEvents(o);
+};
+
+/**
+ * Update events, called internally from the update function. Add new event
+ * handlers, or unbinds events if disabled.
+ * @param  {Object} options Options for map navigation.
+ */
+MapNavigation.prototype.updateEvents = function (options) {
+	var chart = this.chart;
+
+	// Add the double click event
+	if (
+		pick(options.enableDoubleClickZoom,	options.enabled) ||
+		options.enableDoubleClickZoomTo
+	) {
+		this.unbindDblClick = this.unbindDblClick || addEvent(
+			chart.container,
+			'dblclick',
+			function (e) {
+				chart.pointer.onContainerDblClick(e);
 			}
-		}
-	},
+		);
+	} else if (this.unbindDblClick) {
+		// Unbind and set unbinder to undefined
+		this.unbindDblClick = this.unbindDblClick();
+	}
+
+	// Add the mousewheel event
+	if (pick(options.enableMouseWheelZoom, options.enabled)) {
+		this.unbindMouseWheel = this.unbindMouseWheel || addEvent(
+			chart.container,
+			doc.onmousewheel === undefined ? 'DOMMouseScroll' : 'mousewheel',
+			function (e) {
+				chart.pointer.onContainerMouseWheel(e);
+				// Issue #5011, returning false from non-jQuery event does
+				// not prevent default
+				stopEvent(e);
+				return false;
+			}
+		);
+	} else if (this.unbindMouseWheel) {
+		// Unbind and set unbinder to undefined
+		this.unbindMouseWheel = this.unbindMouseWheel();
+	}
+
+};
+
+// Add events to the Chart object itself
+extend(Chart.prototype, /** @lends Chart.prototype */ {
 
 	/**
-	 * Fit an inner box to an outer. If the inner box overflows left or right, align it to the sides of the
-	 * outer. If it overflows both sides, fit it within the outer. This is a pattern that occurs more places
-	 * in Highcharts, perhaps it should be elevated to a common utility function.
+	 * Fit an inner box to an outer. If the inner box overflows left or right,
+	 * align it to the sides of the outer. If it overflows both sides, fit it
+	 * within the outer. This is a pattern that occurs more places in
+	 * Highcharts, perhaps it should be elevated to a common utility function.
+	 *
+	 * @private
 	 */
 	fitToBox: function (inner, outer) {
 		each([['x', 'width'], ['y', 'height']], function (dim) {
 			var pos = dim[0],
 				size = dim[1];
 
-			if (inner[pos] + inner[size] > outer[pos] + outer[size]) { // right overflow
-				if (inner[size] > outer[size]) { // the general size is greater, fit fully to outer
+			if (inner[pos] + inner[size] > outer[pos] + outer[size]) { // right
+				// the general size is greater, fit fully to outer
+				if (inner[size] > outer[size]) {
 					inner[size] = outer[size];
 					inner[pos] = outer[pos];
 				} else { // align right
@@ -92,14 +217,26 @@ extend(Chart.prototype, {
 	},
 
 	/**
-	 * Zoom the map in or out by a certain amount. Less than 1 zooms in, greater than 1 zooms out.
+	 * Highmaps only. Zoom in or out of the map. See also {@link Point#zoomTo}.
+	 * See {@link Chart#fromLatLonToPoint} for how to get the `centerX` and
+	 * `centerY` parameters for a geographic location.
+	 *
+	 * @param  {Number} [howMuch]
+	 *         How much to zoom the map. Values less than 1 zooms in. 0.5 zooms
+	 *         in to half the current view. 2 zooms to twice the current view.
+	 *         If omitted, the zoom is reset.
+	 * @param  {Number} [centerX]
+	 *         The X axis position to center around if available space.
+	 * @param  {Number} [centerY]
+	 *         The Y axis position to center around if available space.
+	 * @param  {Number} [mouseX]
+	 *         Fix the zoom to this position if possible. This is used for
+	 *         example in mousewheel events, where the area under the mouse
+	 *         should be fixed as we zoom in.
+	 * @param  {Number} [mouseY]
+	 *         Fix the zoom to this position if possible.
 	 */
 	mapZoom: function (howMuch, centerXArg, centerYArg, mouseX, mouseY) {
-		/*if (this.isMapZooming) {
-			this.mapZoomQueue = arguments;
-			return;
-		}*/
-
 		var chart = this,
 			xAxis = chart.xAxis[0],
 			xRange = xAxis.max - xAxis.min,
@@ -123,7 +260,11 @@ extend(Chart.prototype, {
 				y: yAxis.dataMin,
 				width: xAxis.dataMax - xAxis.dataMin,
 				height: yAxis.dataMax - yAxis.dataMin
-			});
+			}),
+			zoomOut = newExt.x <= xAxis.dataMin &&
+				newExt.width >= xAxis.dataMax - xAxis.dataMin &&
+				newExt.y <= yAxis.dataMin &&
+				newExt.height >= yAxis.dataMax - yAxis.dataMin;
 
 		// When mousewheel zooming, fix the point under the mouse
 		if (mouseX) {
@@ -134,7 +275,7 @@ extend(Chart.prototype, {
 		}
 
 		// Zoom
-		if (howMuch !== undefined) {
+		if (howMuch !== undefined && !zoomOut) {
 			xAxis.setExtremes(newExt.x, newExt.x + newExt.width, false);
 			yAxis.setExtremes(newExt.y, newExt.y + newExt.height, false);
 
@@ -145,11 +286,14 @@ extend(Chart.prototype, {
 		}
 
 		// Prevent zooming until this one is finished animating
-		/*chart.holdMapZoom = true;
+		/*
+		chart.holdMapZoom = true;
 		setTimeout(function () {
 			chart.holdMapZoom = false;
-		}, 200);*/
-		/*delay = animation ? animation.duration || 500 : 0;
+		}, 200);
+		*/
+		/*
+		delay = animation ? animation.duration || 500 : 0;
 		if (delay) {
 			chart.isMapZooming = true;
 			setTimeout(function () {
@@ -159,7 +303,8 @@ extend(Chart.prototype, {
 				}
 				chart.mapZoomQueue = null;
 			}, delay);
-		}*/
+		}
+		*/
 
 		chart.redraw();
 	}
@@ -169,27 +314,10 @@ extend(Chart.prototype, {
  * Extend the Chart.render method to add zooming and panning
  */
 wrap(Chart.prototype, 'render', function (proceed) {
-	var chart = this,
-		mapNavigation = chart.options.mapNavigation;
+	// Render the plus and minus buttons. Doing this before the shapes makes
+	// getBBox much quicker, at least in Chrome.
+	this.mapNavigation = new MapNavigation(this);
+	this.mapNavigation.update();
 
-	// Render the plus and minus buttons. Doing this before the shapes makes getBBox much quicker, at least in Chrome.
-	chart.renderMapNavigation();
-
-	proceed.call(chart);
-	
-	// Add the double click event
-	if (pick(mapNavigation.enableDoubleClickZoom, mapNavigation.enabled) || mapNavigation.enableDoubleClickZoomTo) {
-		addEvent(chart.container, 'dblclick', function (e) {
-			chart.pointer.onContainerDblClick(e);
-		});
-	}
-
-	// Add the mousewheel event
-	if (pick(mapNavigation.enableMouseWheelZoom, mapNavigation.enabled)) {
-		addEvent(chart.container, doc.onmousewheel === undefined ? 'DOMMouseScroll' : 'mousewheel', function (e) {
-			chart.pointer.onContainerMouseWheel(e);
-			stopEvent(e); // Issue #5011, returning false from non-jQuery event does not prevent default
-			return false;
-		});
-	}
+	proceed.call(this);
 });

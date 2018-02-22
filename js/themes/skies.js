@@ -1,10 +1,17 @@
 /**
+ * (c) 2010-2017 Torstein Honsi
+ *
+ * License: www.highcharts.com/license
+ * 
  * Skies theme for Highcharts JS
  * @author Torstein Honsi
  */
 
+'use strict';
+import Highcharts from '../parts/Globals.js';
 Highcharts.theme = {
-	colors: ["#514F78", "#42A07B", "#9B5E4A", "#72727F", "#1F949A", "#82914E", "#86777F", "#42A07B"],
+	colors: ['#514F78', '#42A07B', '#9B5E4A', '#72727F', '#1F949A',
+		'#82914E', '#86777F', '#42A07B'],
 	chart: {
 		className: 'skies',
 		borderWidth: 0,
@@ -22,13 +29,15 @@ Highcharts.theme = {
 	title: {
 		style: {
 			color: '#3E576F',
-			font: '16px Lucida Grande, Lucida Sans Unicode, Verdana, Arial, Helvetica, sans-serif'
+			font: '16px Lucida Grande, Lucida Sans Unicode,' +
+				' Verdana, Arial, Helvetica, sans-serif'
 		}
 	},
 	subtitle: {
 		style: {
 			color: '#6D869F',
-			font: '12px Lucida Grande, Lucida Sans Unicode, Verdana, Arial, Helvetica, sans-serif'
+			font: '12px Lucida Grande, Lucida Sans Unicode,' +
+				' Verdana, Arial, Helvetica, sans-serif'
 		}
 	},
 	xAxis: {
@@ -44,7 +53,8 @@ Highcharts.theme = {
 		title: {
 			style: {
 				color: '#666',
-				font: '12px Lucida Grande, Lucida Sans Unicode, Verdana, Arial, Helvetica, sans-serif'
+				font: '12px Lucida Grande, Lucida Sans Unicode,' +
+				' Verdana, Arial, Helvetica, sans-serif'
 			}
 		}
 	},
@@ -62,7 +72,8 @@ Highcharts.theme = {
 		title: {
 			style: {
 				color: '#666',
-				font: '12px Lucida Grande, Lucida Sans Unicode, Verdana, Arial, Helvetica, sans-serif'
+				font: '12px Lucida Grande, Lucida Sans Unicode,' +
+				' Verdana, Arial, Helvetica, sans-serif'
 			}
 		}
 	},
@@ -86,4 +97,4 @@ Highcharts.theme = {
 };
 
 // Apply the theme
-var highchartsOptions = Highcharts.setOptions(Highcharts.theme);
+Highcharts.setOptions(Highcharts.theme);

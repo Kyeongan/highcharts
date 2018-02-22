@@ -1,6 +1,4 @@
-$(document).ready(function () {
-
-    var blnNoData = true;
+(function () {
 
     var MapSeriesData = [{
         name: '',
@@ -46,4 +44,4 @@ $(document).ready(function () {
         series: MapSeriesData
     });
 
-});
+}());

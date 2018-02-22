@@ -1,7 +1,9 @@
-$(function () {
-    $.getJSON('https://www.highcharts.com/samples/data/jsonp.php?filename=usdeur.json&callback=?', function (data) {
 
-        $('#container').highcharts({
+$.getJSON(
+    'https://cdn.rawgit.com/highcharts/highcharts/v6.0.5/samples/data/usdeur.json',
+    function (data) {
+
+        Highcharts.chart('container', {
             chart: {
                 zoomType: 'x'
             },
@@ -56,5 +58,5 @@ $(function () {
                 data: data
             }]
         });
-    });
-});
+    }
+);

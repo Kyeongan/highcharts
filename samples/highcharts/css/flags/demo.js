@@ -1,10 +1,13 @@
-$(function () {
-    $.getJSON('https://www.highcharts.com/samples/data/jsonp.php?filename=usdeur.json&callback=?', function (data) {
+
+$.getJSON(
+    'https://cdn.rawgit.com/highcharts/highcharts/v6.0.5/samples/data/usdeur.json',
+    function (data) {
 
         var year = new Date(data[data.length - 1][0]).getFullYear(); // Get year of last data point
 
         // Create the chart
-        $('#container').highcharts('StockChart', {
+
+        Highcharts.stockChart('container', {
 
 
             rangeSelector: {
@@ -80,5 +83,5 @@ $(function () {
                 className: 'darker-flags'
             }]
         });
-    });
-});
+    }
+);

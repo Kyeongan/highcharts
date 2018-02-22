@@ -1,5 +1,22 @@
-
 /**
+ * (c) 2010-2017 Torstein Honsi
+ *
+ * License: www.highcharts.com/license
+ */
+/* eslint max-len: 0 */
+'use strict';
+import H from '../parts/Globals.js';
+import '../parts/Utilities.js';
+import '../parts/Options.js';
+import '../parts/Chart.js';
+var Chart = H.Chart,
+	each = H.each,
+	extend = H.extend,
+	format = H.format,
+	merge = H.merge,
+	win = H.win,
+	wrap = H.wrap;
+/** 
  * Test for point in polygon. Polygon defined as array of [x,y] points.
  */
 function pointInPolygon(point, polygon) {
@@ -23,11 +40,31 @@ function pointInPolygon(point, polygon) {
 }
 
 /**
- * Get point from latLon using specified transform definition
+ * Highmaps only. Get point from latitude and longitude using specified
+ * transform definition.
+ *
+ * @function transformFromLatLon
+ * @memberOf Chart.prototype
+ *
+ * @param  {Object} latLon
+ *         A latitude/longitude object.
+ * @param  {Number} latLon.lat
+ *         The latitude.
+ * @param  {Number} latLon.lon
+ *         The longitude.
+ * @param  {Object} transform
+ *         The transform definition to use as explained in the {@link
+ *         https://www.highcharts.com/docs/maps/latlon|documentation}.
+ *
+ * @return {Object}
+ *         An object with `x` and `y` properties.
+ *
+ * @sample maps/series/latlon-transform/
+ *         Use specific transformation for lat/lon
  */
 Chart.prototype.transformFromLatLon = function (latLon, transform) {
 	if (win.proj4 === undefined) {
-		error(21);
+		H.error(21);
 		return {
 			x: 0,
 			y: null
@@ -46,11 +83,29 @@ Chart.prototype.transformFromLatLon = function (latLon, transform) {
 };
 
 /**
- * Get latLon from point using specified transform definition
+ * Highmaps only. Get latLon from point using specified transform definition.
+ * The method returns an object with the numeric properties `lat` and `lon`.
+ *
+ * @function transformToLatLon
+ * @memberOf Chart.prototype
+ *
+ * @param  {Point|Object} point
+ *         A `Point` instance, or or any object containing the properties `x`
+ *         and `y` with numeric values.
+ * @param  {Object} transform
+ *         The transform definition to use as explained in the {@link
+ *         https://www.highcharts.com/docs/maps/latlon|documentation}.
+ *
+ * @return {Object}
+ *         An object with `lat` and `lon` properties.
+ *
+ * @sample maps/series/latlon-transform/
+ *         Use specific transformation for lat/lon
+ *                         
  */
 Chart.prototype.transformToLatLon = function (point, transform) {
 	if (win.proj4 === undefined) {
-		error(21);
+		H.error(21);
 		return;
 	}
 
@@ -69,12 +124,28 @@ Chart.prototype.transformToLatLon = function (point, transform) {
 	return { lat: projected.y, lon: projected.x };
 };
 
+/**
+ * Highmaps only. Calculate latitude/longitude values for a point. Returns an
+ * object with the numeric properties `lat` and `lon`.
+ *
+ * @function fromPointToLatLon
+ * @memberOf Chart.prototype
+ * 
+ * @param  {Point|Object} point
+ *         A `Point` instance or anything containing `x` and `y` properties
+ *         with numeric values
+ * @return {Object}
+ *         An object with `lat` and `lon` properties.
+ *
+ * @sample maps/demo/latlon-advanced/
+ *         Advanced lat/lon demo
+ */
 Chart.prototype.fromPointToLatLon = function (point) {
 	var transforms = this.mapTransforms,
 		transform;
 
 	if (!transforms) {
-		error(22);
+		H.error(22);
 		return;
 	}
 
@@ -88,13 +159,33 @@ Chart.prototype.fromPointToLatLon = function (point) {
 	return this.transformToLatLon(point, transforms['default']); // eslint-disable-line dot-notation
 };
 
+/**
+ * Highmaps only. Get chart coordinates from latitude/longitude. Returns an
+ * object with x and y values corresponding to the `xAxis` and `yAxis`.
+ *
+ * @function fromLatLonToPoint
+ * @memberOf Chart.prototype
+ * 
+ * @param  {Object} latLon
+ *         Coordinates.
+ * @param  {Number} latLon.lat
+ *         The latitude.
+ * @param  {Number} latLon.lon
+ *         The longitude.
+ *
+ * @sample maps/series/latlon-to-point/
+ *         Find a point from lat/lon
+ *         
+ * @return {Object}
+ *         X and Y coordinates in terms of chart axis values.
+ */
 Chart.prototype.fromLatLonToPoint = function (latLon) {
 	var transforms = this.mapTransforms,
 		transform,
 		coords;
 
 	if (!transforms) {
-		error(22);
+		H.error(22);
 		return {
 			x: 0,
 			y: null
@@ -114,9 +205,36 @@ Chart.prototype.fromLatLonToPoint = function (latLon) {
 };
 
 /**
- * Convert a geojson object to map data of a given Highcharts type (map, mappoint or mapline).
+ * Highmaps only. Restructure a GeoJSON object in preparation to be read
+ * directly by the {@link
+ * https://api.highcharts.com/highmaps/plotOptions.series.mapData|
+ * series.mapData} option. The GeoJSON will be broken down to fit a specific
+ * Highcharts type, either `map`, `mapline` or `mappoint`. Meta data in
+ * GeoJSON's properties object will be copied directly over to 
+ * {@link Point.properties} in Highmaps.
+ *
+ * @function #geojson
+ * @memberOf Highcharts
+ *
+ * @param  {Object} geojson
+ *         The GeoJSON structure to parse, represented as a JavaScript object
+ *         rather than a JSON string.
+ * @param  {String} [hType=map]
+ *         The Highmaps series type to prepare for. Setting "map" will return
+ *         GeoJSON polygons and multipolygons. Setting "mapline" will return
+ *         GeoJSON linestrings and multilinestrings. Setting "mappoint" will
+ *         return GeoJSON points and multipoints.
+ *
+ * @return {Object}
+ *         An object ready for the `mapData` option.
+ *
+ * @sample maps/demo/geojson/
+ *         Simple areas
+ * @sample maps/demo/geojson-multiple-types/
+ *         Multiple types
+ *         
  */
-Highcharts.geojson = function (geojson, hType, series) {
+H.geojson = function (geojson, hType, series) {
 	var mapData = [],
 		path = [],
 		polygonToPath = function (polygon) {
@@ -181,13 +299,22 @@ Highcharts.geojson = function (geojson, hType, series) {
 		if (point) {
 			mapData.push(extend(point, {
 				name: properties.name || properties.NAME,
+
+				/**
+				 * In Highmaps, when data is loaded from GeoJSON, the GeoJSON
+				 * item's properies are copied over here.
+				 *
+				 * @name #properties
+				 * @memberOf Point
+				 * @type {Object}
+				 */
 				properties: properties
 			}));
 		}
 
 	});
 
-	// Create a credits text that includes map source, to be picked up in Chart.showCredits
+	// Create a credits text that includes map source, to be picked up in Chart.addCredits
 	if (series && geojson.copyrightShort) {
 		series.chart.mapCredits = format(series.chart.options.credits.mapText, { geojson: geojson });
 		series.chart.mapCreditsFull = format(series.chart.options.credits.mapTextFull, { geojson: geojson });
@@ -197,18 +324,18 @@ Highcharts.geojson = function (geojson, hType, series) {
 };
 
 /**
- * Override showCredits to include map source by default
+ * Override addCredits to include map source by default
  */
-wrap(Chart.prototype, 'showCredits', function (proceed, credits) {
+wrap(Chart.prototype, 'addCredits', function (proceed, credits) {
+
+	credits = merge(true, this.options.credits, credits);
 
 	// Disable credits link if map credits enabled. This to allow for in-text anchors.
 	if (this.mapCredits) {
 		credits.href = null;
 	}
 
-	proceed.call(this, Highcharts.merge(credits, {
-		text: credits.text + (this.mapCredits || '') // Add map credits to credits text
-	}));
+	proceed.call(this, credits);
 
 	// Add full map credits to hover
 	if (this.credits && this.mapCreditsFull) {

@@ -210,7 +210,7 @@ QUnit.test('Keeping names updated with dynamic data', function (assert) {
 
     assert.strictEqual(
         names.toString(),
-        'Addid1,Addid2,Upda1,Upda2', // Note that xAxis.series order gets changed when series.update. It may be considered a bug.
+        'Upda1,Upda2,Addid1,Addid2',
         'Series.update'
     );
 
@@ -221,19 +221,19 @@ QUnit.test('Keeping names updated with dynamic data', function (assert) {
 
     assert.strictEqual(
         names.toString(),
-        'Addid1,Addid2,UpdatPoint,Upda2',
+        'UpdatPoint,Upda2,Addid1,Addid2',
         'Point.update'
     );
 
     chart.series[0].points[0].remove();
     assert.strictEqual(
         names.toString(),
-        'Addid1,Addid2,Upda2',
+        'Upda2,Addid1,Addid2',
         'Point.remove'
     );
 });
 
-QUnit.test('nameToX default in the data module', function (assert) {
+QUnit.test('uniqueNames default in the data module', function (assert) {
     var chart = Highcharts.chart('container', {
         data: {
             "seriesMapping": [{
@@ -271,12 +271,12 @@ QUnit.test('nameToX default in the data module', function (assert) {
     );
 });
 
-QUnit.test('nameToX: false', function (assert) {
+QUnit.test('uniqueNames: false', function (assert) {
     var chart = Highcharts.chart('container', {
 
         xAxis: {
             type: 'category',
-            nameToX: false
+            uniqueNames: false
         },
 
         series: [{
@@ -302,12 +302,12 @@ QUnit.test('nameToX: false', function (assert) {
     );
 });
 
-QUnit.test('nameToX: true', function (assert) {
+QUnit.test('uniqueNames: true', function (assert) {
     var chart = Highcharts.chart('container', {
 
         xAxis: {
             type: 'category',
-            nameToX: true
+            uniqueNames: true
         },
 
         series: [{
@@ -331,4 +331,348 @@ QUnit.test('nameToX: true', function (assert) {
         2,
         'Equal categories creates stacks'
     );
+});
+
+QUnit.test('Keeping updated with setData (#5768)', function (assert) {
+    var chart = Highcharts.chart('container', {
+        chart: {
+            type: 'column'
+        },
+
+        xAxis: {
+            type: 'category'
+        },
+
+        series: [{
+            data: [{
+                name: 'Point 1',
+                color: '#00FF00',
+                y: 1
+            }, {
+                name: 'Point 2',
+                color: '#FF00FF',
+                y: 5
+            }]
+        }]
+    });
+    assert.strictEqual(
+        chart.xAxis[0].names.join(','),
+        'Point 1,Point 2',
+        'Good to go'
+    );
+
+    chart.series[0].setData([{
+        name: 'Updated 1',
+        color: '#00FF00',
+        y: 2
+    }, {
+        name: 'Updated 2',
+        color: '#FF00FF',
+        y: 3
+    }, {
+        name: 'Updated 3',
+        color: '#8800FF',
+        y: 3
+    }]);
+
+    assert.strictEqual(
+        chart.xAxis[0].names.join(','),
+        'Updated 1,Updated 2,Updated 3',
+        'Changed with setData'
+    );
+});
+
+
+QUnit.test('Set crosshair width (#5819)', function (assert) {
+    var chart = Highcharts.chart('container', {
+        xAxis: {
+            type: 'category',
+            crosshair: {
+                color: 'black',
+                width: 1
+            }
+        },
+        series: [{
+            data: [1, 2, 3, 4, 5]
+        }]
+    });
+
+    chart.series[0].points[1].onMouseOver();
+    chart.xAxis[0].drawCrosshair({}, chart.series[0].points[1]);
+
+    assert.strictEqual(chart.xAxis[0].cross['stroke-width'], 1, 'Stroke width is set to 1');
+});
+
+QUnit.test('Extremes unaltered after redraw (#5928)', function (assert) {
+    var chart = Highcharts.chart('container', {
+
+        chart: {
+            width: 400,
+            animation: false
+        },
+
+        xAxis: {
+            type: 'category',
+            uniqueNames: false
+        },
+
+        "series": [{
+            animation: false,
+            "data": [
+                ["2014", 1.1],
+                ["2013", 11.6],
+                ["2012", 8.4]
+            ]
+        }]
+    });
+
+    assert.strictEqual(
+        chart.xAxis[0].min,
+        0,
+        'Initial min'
+    );
+
+    assert.strictEqual(
+        chart.xAxis[0].max,
+        2,
+        'Initial max'
+    );
+
+    chart.setSize(390);
+
+
+
+    assert.strictEqual(
+        chart.xAxis[0].min,
+        0,
+        'Unaltered min'
+    );
+
+    assert.strictEqual(
+        chart.xAxis[0].max,
+        2,
+        'Unaltered max'
+    );
+
+
+    chart.series[0].addPoint(['2016', 3]);
+
+    assert.strictEqual(
+        chart.xAxis[0].min,
+        0,
+        'Unaltered min'
+    );
+
+    assert.strictEqual(
+        chart.xAxis[0].max,
+        3,
+        'Increased max'
+    );
+});
+
+QUnit.test(
+    'Keep names after redraw when point.options.x is set (#6207)',
+    function (assert) {
+        var chart = new Highcharts.Chart({
+            chart: {
+                renderTo: 'container',
+                type: 'column'
+            },
+            xAxis: {
+                type: 'category'
+            },
+
+            series: [{
+                data: [{
+                    x: 0,
+                    y: 3750,
+                    name: "Zero"
+                }, {
+                    x: 1,
+                    y: 3000,
+                    name: "One"
+                }, {
+                    x: 3,
+                    y: 2500,
+                    name: "Three"
+                }]
+            }]
+        });
+
+        assert.strictEqual(
+            chart.xAxis[0].names.toString(),
+            'Zero,One,,Three',
+            'Initial names'
+        );
+
+        chart.series[0].hide();
+        chart.series[0].show();
+        assert.strictEqual(
+            chart.xAxis[0].names.toString(),
+            'Zero,One,,Three',
+            'Preserved names'
+        );
+
+    }
+);
+
+QUnit.test(
+    'Lost series with multiple axes and mixed configuration (#6469)',
+    function (assert) {
+        var chart = Highcharts.chart('container', {
+            chart: {
+                type: "column",
+                animation: false
+            },
+            xAxis: {
+                type: "category",
+                categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            },
+            yAxis: [{
+                lineWidth: 1,
+                title: {
+                    text: 'Primary Axis'
+                }
+            }, {
+                lineWidth: 1,
+                opposite: true,
+                title: {
+                    text: 'Secondary Axis'
+                }
+            }],
+
+            plotOptions: {
+                series: {
+                    animation: false
+                }
+            },
+
+            series: [{
+                data: [29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 216.4, 194.1, 95.6, 54.4],
+                yAxis: 0
+            }, {
+                data: [
+                    ["Jan", 14400.0],
+                    ["Feb", 17600.0],
+                    ["Mar", 13500.6],
+                    ["Apr", 14800.5],
+                    ["May", 21600.4],
+                    ["Jun", 19400.1],
+                    ["Jul", 9500.6],
+                    ["Aug", 5400.4],
+                    ["Sep", 2900.9],
+                    ["Oct", 7100.5],
+                    ["Nov", 10600.4],
+                    ["Dec", 12900.2]
+                ],
+                yAxis: 1,
+                type: "spline"
+            }]
+        });
+
+        chart.series[0].hide();
+        chart.series[0].show();
+
+        assert.strictEqual(
+            chart.xAxis[0].tickPositions.length,
+            12,
+            'All ticks intact'
+        );
+        assert.strictEqual(
+            chart.xAxis[0].min,
+            0,
+            'Correct min'
+        );
+        assert.strictEqual(
+            chart.xAxis[0].max,
+            11,
+            'Correct max'
+        );
+    }
+);
+
+QUnit.test(
+    'Show last label on category axes by default in Highstock (#6104)',
+    function (assert) {
+        var chart = Highcharts.stockChart('container', {
+                yAxis: [{
+                    categories: []
+                }, {
+                    opposite: false
+                }, {
+                    opposite: false,
+                    type: 'category'
+                }],
+                series: [{
+                    data: [1, 2, 2, 1]
+                }, {
+                    data: [10, 12, 12, 11],
+                    yAxis: 1
+                }, {
+                    data: [20, 22, 22, 21],
+                    yAxis: 2
+                }]
+            }),
+            yAxes = chart.yAxis;
+
+        assert.ok(yAxes[0].categories && yAxes[0].options.showLastLabel,
+            'First axis has categories and shows last label');
+
+        assert.notOk(yAxes[1].categories || yAxes[1].options.showLastLabel,
+            '2nd axis does not have categories or shows last label');
+
+        assert.ok(yAxes[2].categories && yAxes[2].options.showLastLabel,
+            '3rd axis has categories and shows last label');
+    }
+);
+
+QUnit.test('Test different point.name types.', function (assert) {
+    var UNDEFINED,
+        labels = ['0', true, false, NaN, '', 'Proper', '6', 0, Infinity],
+        chart = $('#container').highcharts({
+            xAxis: {
+                type: "category"
+            },
+            chart: {
+                width: 600
+            },
+            series: [{
+                data: [{
+                    name: null,
+                    y: 0
+                }, {
+                    name: labels[1],
+                    y: 1
+                }, {
+                    name: labels[2],
+                    y: 2
+                }, {
+                    name: labels[3],
+                    y: 3
+                }, {
+                    name: labels[4],
+                    y: 4
+                }, {
+                    name: labels[5],
+                    y: 5
+                }, {
+                    name: UNDEFINED,
+                    y: 5
+                }, {
+                    name: labels[7],
+                    y: 7
+                }, {
+                    name: labels[8],
+                    y: 8
+                }]
+            }]
+        }).highcharts();
+
+    $.each(chart.xAxis[0].tickPositions, function (i, pos) {
+        assert.strictEqual(
+            chart.xAxis[0].ticks[pos].label.textStr.toString(),
+            labels[pos].toString(),
+            'X axis label for position ' + pos
+        );
+    });
 });

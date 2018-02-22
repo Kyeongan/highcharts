@@ -1,7 +1,9 @@
-$(function () {
-    $.getJSON('https://www.highcharts.com/samples/data/jsonp.php?filename=range.json&callback=?', function (data) {
 
-        $('#container').highcharts({
+$.getJSON(
+    'https://cdn.rawgit.com/highcharts/highcharts/v6.0.5/samples/data/range.json',
+    function (data) {
+
+        Highcharts.chart('container', {
 
             chart: {
                 type: 'arearange',
@@ -38,6 +40,5 @@ $(function () {
             }]
 
         });
-    });
-
-});
+    }
+);

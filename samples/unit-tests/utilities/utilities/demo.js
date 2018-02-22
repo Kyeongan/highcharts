@@ -1,5 +1,5 @@
 /* eslint func-style:0, object-curly-spacing: 0 */
-$(function () {
+(function () {
 
     var dateFormat = Highcharts.dateFormat,
         extend = Highcharts.extend,
@@ -7,17 +7,13 @@ $(function () {
         numberFormat = Highcharts.numberFormat,
         pInt = Highcharts.pInt,
         setOptions = Highcharts.setOptions,
-        splat = Highcharts.splat,
-        stableSort = Highcharts.stabeSort;
+        splat = Highcharts.splat;
 
     /**
      * Wrapper because of fast migration from earlier system
      */
     function assertEquals(assert, message, actual, expected) {
         assert.equal(expected, actual, message);
-    }
-    function assertUndefined(assert, message, actual) {
-        assert.strictEqual(undefined, actual, message);
     }
 
     function countMembers(obj) {
@@ -69,7 +65,7 @@ $(function () {
         assertEquals(assert, "base 16", 15, pInt("F", 16));
     });
 
-/*
+    /*
     QUnit.test('IsString', function (assert) {
         // test with undefined
         assertEquals(assert, "IsString undefined", false, isString(undefined));
@@ -89,7 +85,7 @@ $(function () {
         // test with string
         assertEquals(assert, "IsString string", true, isString("this is a string"));
     });
-*/
+    */
 
     QUnit.test('IsObject', function (assert) {
         var isObject = Highcharts.isObject;
@@ -119,7 +115,7 @@ $(function () {
         assertEquals(assert, "IsObject strict array", false, isObject([], true));
     });
 
-/*
+    /*
     QUnit.test('IsArray', function (assert) {
         // test with undefined
         assertEquals(assert, "isArray undefined", false, isArray(undefined));
@@ -140,25 +136,7 @@ $(function () {
         assertEquals(assert, "isArray array", true, isArray([]));
 
     });
-*/
-/*
-    QUnit.test('IsNumber', function (assert) {
-        // test with undefined
-        assertEquals(assert, "IsNumber undefined", false, isNumber(undefined));
-
-        // test with null
-        assertEquals(assert, "IsNumber null", false, isNumber(null));
-
-        // test with number
-        assertEquals(assert, "IsNumber number", true, isNumber(15));
-
-        // test with string
-        assertEquals(assert, "IsNumber string", false, isNumber("this is a string"));
-
-        // test with object
-        assertEquals(assert, "IsNumber object", false, isNumber({}));
-    });
-*/
+    */
     QUnit.test('Splat', function (assert) {
 
         // test with undefined
@@ -180,10 +158,10 @@ $(function () {
         assertEquals(assert, "splat object", 1, splat({}).length);
 
         // test with array
-        assertEquals(assert, "splat array", 3, splat([1,2,3]).length);
+        assertEquals(assert, "splat array", 3, splat([1, 2, 3]).length);
     });
 
-/*
+    /*
     QUnit.test('StableSort', function (assert) {
         // Initialize the array, it needs to be a certain size to trigger the unstable quicksort algorithm.
         // These 11 items fails in Chrome due to its unstable sort.
@@ -215,7 +193,7 @@ $(function () {
         assertEquals(assert, 'Stable sort in action', 'ABCDEFGHIJK', result.join(''));
         assertUndefined(assert, 'Stable sort index should not be there', arr[0].ss_i);
     });
-*/
+    */
 
     /**
      * Tests that destroyObjectProperties calls the destroy method on properties before delete.
@@ -253,6 +231,7 @@ $(function () {
      * Test number formatting
      */
     QUnit.test('NumberFormat', function (assert) {
+        var i;
 
         assertEquals(assert, 'Integer with decimals', "1.00", numberFormat(1, 2));
         assertEquals(assert, 'Integer with decimal point', "1,0", numberFormat(1, 1, ','));
@@ -271,6 +250,40 @@ $(function () {
         assertEquals(assert, 'Rounding negative (#4573)', "-342 000.00", numberFormat(-342000, 2));
         assertEquals(assert, 'String decimal count', "2 016", numberFormat(2016, '0'));
         assertEquals(assert, 'Rounding', "2.0", numberFormat(1.96, 1));
+        assertEquals(assert, 'Rounding', "1.00", numberFormat(0.995, 2));
+        assertEquals(assert, 'Rounding', "-1.00", numberFormat(-0.995, 2));
+
+        assertEquals(assert, 'Exponential', "3.00e+22", numberFormat(30000000000000000000000));
+        assertEquals(assert, 'Exponential', "3.20e+22", numberFormat(32000000000000000000000));
+        assertEquals(assert, 'Exponential', "3,20e+22", numberFormat(32000000000000000000000, 2, ','));
+        assertEquals(assert, 'Exponential', "3e+22", numberFormat(30000000000000000000000, 0));
+        assertEquals(assert, 'Exponential', "1.5e+36", numberFormat(1.5e+36, -1));
+
+        assertEquals(
+            assert,
+            'Decimals limit with exponential (#7042)',
+            '0.00',
+            numberFormat(1.5e-9, 2)
+        );
+
+        // small numbers with set decimals (#7405)
+        for (i = 7; i < 11; i++) {
+            assertEquals(
+                assert,
+                'Decimals = ' + i + ' - precision to ' + i + 'th digit after .',
+                ['0.0000000', '0.00000000', '2e-9', '1.9e-9'][i - 7],
+                numberFormat(1.9e-9, i)
+            );
+        }
+
+        for (i = 6; i < 10; i++) {
+            assertEquals(
+                assert,
+                'Decimals = ' + i + ' - precision to ' + i + 'th digit after .',
+                ['0.000001', '6e-7', '6.3e-7', '6.26e-7'][i - 6],
+                numberFormat(6.26e-7, i)
+            );
+        }
     });
 
 
@@ -333,6 +346,12 @@ $(function () {
             "Key: January, value: 3.14, date: 2012-01-01.",
             format("Key: {point.key}, value: {point.value:.2f}, date: {point.date:%Y-%m-%d}.", { point: point })
         );
+
+        assert.strictEqual(
+            Highcharts.format('{point.y}', {}),
+            '',
+            'Do not choke on undefined objects (node-export-server#31)'
+        );
     });
 
 
@@ -365,6 +384,134 @@ $(function () {
         );
     });
 
+
+    QUnit.test('isDOMElement', function (assert) {
+        var isDOMElement = Highcharts.isDOMElement,
+            // Mock an ES6 class
+            classes = {
+                constructor: function TestClass() {}
+            };
+
+        assert.strictEqual(
+          isDOMElement("a"),
+          false,
+          'String is not a HTML Element'
+        );
+        assert.strictEqual(
+          isDOMElement(1),
+          false,
+          'Number is not a HTML Element'
+        );
+        assert.strictEqual(
+          isDOMElement(true),
+          false,
+          'Boolean is not a HTML Element'
+        );
+        assert.strictEqual(
+          isDOMElement(null),
+          false,
+          'null is not a HTML Element'
+        );
+        assert.strictEqual(
+          isDOMElement(undefined),
+          false,
+          'undefined is not a HTML Element'
+        );
+        assert.strictEqual(
+          isDOMElement([1]),
+          false,
+          'Array is not a HTML Element'
+        );
+        assert.strictEqual(
+          isDOMElement({ a: 1 }),
+          false,
+          'Object is not a HTML Element'
+        );
+        assert.strictEqual(
+          isDOMElement(classes),
+          false,
+          'Object classes is not a HTML Element'
+        );
+        assert.strictEqual(
+          isDOMElement(document.createElement('div')),
+          true,
+          'HTMLElement is a HTML Element'
+        );
+        assert.strictEqual(
+          isDOMElement(function Test() {}),
+          false,
+          'Function is not a HTML Element'
+        );
+    });
+
+    QUnit.test('isClass', function (assert) {
+        var isClass = Highcharts.isClass,
+            // Mock an ES6 class
+            classes = {
+                constructor: function TestClass() {}
+            };
+
+        assert.strictEqual(
+          isClass("a"),
+          false,
+          'String is not a class'
+        );
+        assert.strictEqual(
+          isClass(1),
+          false,
+          'Number is not a class'
+        );
+        assert.strictEqual(
+          isClass(true),
+          false,
+          'Boolean is not a class'
+        );
+        assert.strictEqual(
+          isClass(null),
+          false,
+          'null is not a class'
+        );
+        assert.strictEqual(
+          isClass(undefined),
+          false,
+          'undefined is not a class'
+        );
+        assert.strictEqual(
+          isClass([1]),
+          false,
+          'Array is not a class'
+        );
+        assert.strictEqual(
+          isClass({ a: 1 }),
+          false,
+          'Object is not a class'
+        );
+
+        if ((function myFunc() {}).name === 'myFunc') { // IE11 doesn't support function name
+            assert.strictEqual(
+              isClass(classes),
+              true,
+              'Object classes is a class'
+            );
+        }
+        // Some legacy browsers do not have named functions
+        classes.constructor = function () {};
+        assert.strictEqual(
+          isClass(classes),
+          false,
+          'Object with unnamed constructor is not a class'
+        );
+        assert.strictEqual(
+          isClass(document.createElement('div')),
+          false,
+          'HTMLElement is not a class'
+        );
+        assert.strictEqual(
+          isClass(function Test() {}),
+          false,
+          'Function is not a class'
+        );
+    });
 
     QUnit.test('isNumber', function (assert) {
         var isNumber = Highcharts.isNumber;
@@ -414,7 +561,7 @@ $(function () {
             'number with decimals (0.12) returns true'
         );
         assert.strictEqual(
-            isNumber(.12),
+            isNumber(0.12),
             true,
             'number with only decimals (.12) returns true'
         );
@@ -428,7 +575,204 @@ $(function () {
             true,
             'negative number with decimals (-1.123) returns true'
         );
+        assert.strictEqual(
+            isNumber(Infinity),
+            false,
+            'Infinity is not a finite number'
+        );
+        assert.strictEqual(
+            isNumber(-Infinity),
+            false,
+            '-Infinity is not a finite number'
+        );
     });
 
+    QUnit.test('wrap', function (assert) {
+        var Person = function (name) {
+            this.name = name;
+        };
+        Person.prototype.setName = function (name) {
+            this.name = name;
+        };
 
-});
+        var person = new Person('Torstein');
+        assert.strictEqual(
+            person.name,
+            'Torstein',
+            'Initial value'
+        );
+
+        person.setName('Torstein Honsi');
+        assert.strictEqual(
+            person.name,
+            'Torstein Honsi',
+            'Initial value'
+        );
+
+        Highcharts.wrap(Person.prototype, 'setName', function (proceed) {
+            proceed.apply(this, Array.prototype.slice.call(arguments, 1));
+            this.name += ' Extended';
+        });
+        person.setName('Torstein');
+
+        assert.strictEqual(
+            person.name,
+            'Torstein Extended',
+            'Wrapped'
+        );
+
+        // Wrap using this.proceed() with no arguments
+        Person.prototype.setAge = function (age) {
+            this.age = age;
+        };
+        person.setAge(42);
+        assert.strictEqual(
+            person.age,
+            42,
+            'Initial age'
+        );
+
+        Highcharts.wrap(Person.prototype, 'setAge', function () {
+            this.proceed();
+            this.age += 1;
+        });
+        person.setAge(43);
+        assert.strictEqual(
+            person.age,
+            44,
+            'Wrapped age'
+        );
+
+
+        // Wrap with this.proceed() with modified arguments
+        Person.prototype.setHeight = function (height) {
+            this.height = height;
+        };
+        person.setHeight(188);
+        assert.strictEqual(
+            person.height,
+            188,
+            'Initial height'
+        );
+
+        Highcharts.wrap(Person.prototype, 'setHeight', function (proceed, height) {
+            this.proceed(height + 1);
+        });
+        person.setHeight(189);
+        assert.strictEqual(
+            person.height,
+            190,
+            'Wrapped height'
+        );
+    });
+
+    QUnit.test('find', function (assert) {
+
+        assert.strictEqual(
+            Highcharts.find([1, 2, 3, 4, 5], function (item) {
+                return item >= 3;
+            }),
+            3,
+            'Returns first item'
+        );
+
+        assert.deepEqual(
+            Highcharts.find([1, 2, { id: 'findMe' }, 4, 5], function (item) {
+                return item && item.id === 'findMe';
+            }),
+            { id: 'findMe' },
+            'Returns first item'
+        );
+    });
+
+    QUnit.test('objectEach', function (assert) {
+        var objectEach = Highcharts.objectEach,
+            obj1 = {
+                '1': 1,
+                '2': '2',
+                3: '3'
+            },
+            obj1Expected = {
+                '1': 1,
+                '2': '2',
+                '3': '3'
+            },
+            obj1Actual = {},
+            testFunction = function () {
+                return 2;
+            },
+            TestObj = function () {
+                this.one = 1;
+                this.two = testFunction;
+            },
+            obj2,
+            obj2Expected = {
+                'one': 1,
+                'two': testFunction
+            },
+            obj2Actual = {},
+            arr1 = ['1', '2', '3'],
+            arr1Expected = {
+                '0': '1',
+                '1': '2',
+                '2': '3'
+            },
+            arr1Actual = {},
+            obj3 = {
+                'one': 'one'
+            },
+            obj3This = {
+                'ctx': 'ctx'
+            };
+
+        TestObj.prototype.three = 3;
+        TestObj.prototype.four = function () {
+            return 4;
+        };
+        obj2 = new TestObj();
+
+        objectEach(obj1, function (val, key) {
+            obj1Actual[key] = val;
+        });
+
+        assert.deepEqual(
+            obj1Actual,
+            obj1Expected,
+            'Order of callback params is [val, key]'
+        );
+
+        objectEach(obj2, function (val, key) {
+            obj2Actual[key] = val;
+        });
+
+        assert.deepEqual(
+            obj2Actual,
+            obj2Expected,
+            'Prototype properties are not included'
+        );
+
+        objectEach(arr1, function (val, key) {
+            arr1Actual[key] = val;
+        });
+
+        assert.deepEqual(
+            arr1Actual,
+            arr1Expected,
+            'Supports arrays'
+        );
+
+        objectEach(obj3, function (val, key, ctx) {
+            assert.equal(
+                this,
+                obj3This,
+                '3rd param injects context to use with `this`'
+            );
+
+            assert.equal(
+                ctx,
+                obj3,
+                '3rd param in callback is the object being iterated over'
+            );
+        }, obj3This);
+    });
+}());

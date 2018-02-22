@@ -1,4 +1,17 @@
 /**
+ * (c) 2010-2017 Torstein Honsi
+ *
+ * License: www.highcharts.com/license
+ */
+'use strict';
+import H from '../parts/Globals.js';
+import '../parts/Utilities.js';
+import '../parts/Axis.js';
+var Axis = H.Axis,
+	each = H.each,
+	pick = H.pick,
+	wrap = H.wrap;
+/**
  * Override to use the extreme coordinates from the SVG shape, not the
  * data values
  */
@@ -9,7 +22,8 @@ wrap(Axis.prototype, 'getSeriesExtremes', function (proceed) {
 		xData = [],
 		useMapGeometry;
 
-	// Remove the xData array and cache it locally so that the proceed method doesn't use it
+	// Remove the xData array and cache it locally so that the proceed method
+	// doesn't use it
 	if (isXAxis) {
 		each(this.series, function (series, i) {
 			if (series.useMapGeometry) {
@@ -29,7 +43,7 @@ wrap(Axis.prototype, 'getSeriesExtremes', function (proceed) {
 		each(this.series, function (series, i) {
 			if (series.useMapGeometry) {
 				dataMin = Math.min(dataMin, pick(series.minX, dataMin));
-				dataMax = Math.max(dataMax, pick(series.maxX, dataMin));
+				dataMax = Math.max(dataMax, pick(series.maxX, dataMax));
 				series.xData = xData[i]; // Reset xData array
 				useMapGeometry = true;
 			}
@@ -60,7 +74,7 @@ wrap(Axis.prototype, 'setAxisTranslation', function (proceed) {
 	proceed.call(this);
 
 	// Check for map-like series
-	if (this.coll === 'yAxis' && xAxis.transA !== UNDEFINED) {
+	if (this.coll === 'yAxis' && xAxis.transA !== undefined) {
 		each(this.series, function (series) {
 			if (series.preserveAspectRatio) {
 				preserveAspectRatio = true;
@@ -74,7 +88,8 @@ wrap(Axis.prototype, 'setAxisTranslation', function (proceed) {
 		// Use the same translation for both axes
 		this.transA = xAxis.transA = Math.min(this.transA, xAxis.transA);
 
-		mapRatio = plotRatio / ((xAxis.max - xAxis.min) / (this.max - this.min));
+		mapRatio = plotRatio /
+			((xAxis.max - xAxis.min) / (this.max - this.min));
 
 		// What axis to pad to put the map in the middle
 		padAxis = mapRatio < 1 ? this : xAxis;
@@ -88,7 +103,13 @@ wrap(Axis.prototype, 'setAxisTranslation', function (proceed) {
 		if (fixTo) {
 			fixDiff = fixTo[1] - padAxis.toValue(fixTo[0], true);
 			fixDiff *= padAxis.transA;
-			if (Math.abs(fixDiff) > padAxis.minPixelPadding || (padAxis.min === padAxis.dataMin && padAxis.max === padAxis.dataMax)) { // zooming out again, keep within restricted area
+			if (
+				Math.abs(fixDiff) > padAxis.minPixelPadding ||
+				(
+					padAxis.min === padAxis.dataMin &&
+					padAxis.max === padAxis.dataMax
+				)
+			) { // zooming out again, keep within restricted area
 				fixDiff = 0;
 			}
 			padAxis.minPixelPadding -= fixDiff;

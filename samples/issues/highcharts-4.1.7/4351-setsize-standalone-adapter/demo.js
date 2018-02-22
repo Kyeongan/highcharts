@@ -1,5 +1,5 @@
 $(function () {
-    QUnit.test("Chart has proper dimensions after resize using standalone adapter." , function (assert) {
+    QUnit.test("Chart has proper dimensions after resize using standalone adapter.", function (assert) {
         var width = 200,
             height = 300,
             chart = new Highcharts.Chart({
@@ -14,15 +14,17 @@ $(function () {
 
         chart.setSize(width, height, false);
 
-        assert.strictEqual(
+        assert.close(
             container.width(),
             width,
+            0.0001,
             "Proper width"
         );
 
-        assert.strictEqual(
+        assert.close(
             container.height(),
             height,
+            0.0001,
             "Proper height"
         );
     });

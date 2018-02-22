@@ -1,8 +1,10 @@
-$(function () {
 
-    $.getJSON('https://www.highcharts.com/samples/data/jsonp.php?filename=aapl-c.json&callback=?', function (data) {
+
+$.getJSON(
+    'https://www.highcharts.com/samples/data/aapl-c.json',
+    function (data) {
         // Create the chart
-        $('#container').highcharts('StockChart', {
+        Highcharts.stockChart('container', {
 
             chart: {
                 marginRight: 50
@@ -17,11 +19,7 @@ $(function () {
             },
 
             xAxis: {
-                crosshair: {
-                    label: {
-                        enabled: true
-                    }
-                }
+                crosshair: true
             },
 
             yAxis: {
@@ -48,6 +46,6 @@ $(function () {
                 }
             }]
         });
-    });
+    }
+);
 
-});

@@ -13,7 +13,7 @@ $(function () {
 
             series: [{
                 animation: false,
-                data: [1,2,3,4,5, -5],
+                data: [1, 2, 3, 4, 5, -5],
                 showInLegend: true
             }]
 
@@ -64,9 +64,9 @@ $(function () {
         );
 
         // @todo Create an extensive unit test for PieSeries.updateTotals to replace this
-        assert.equal(
-            chart.series[0].points[5].y,
-            null,
+        assert.strictEqual(
+            chart.series[0].points[5].isNull,
+            true,
             'Disallow negative data. #5322'
         );
 

@@ -1,6 +1,7 @@
-$(function () {
 
-    $.getJSON('https://www.highcharts.com/samples/data/jsonp.php?filename=world-population-history.csv&callback=?', function (csv) {
+$.ajax({
+    url: 'https://cdn.rawgit.com/highcharts/highcharts/v6.0.4/samples/data/world-population-history.csv',
+    success: function (csv) {
 
         // Parse the CSV Data
         /*Highcharts.data({
@@ -24,24 +25,25 @@ $(function () {
             mapChart,
             countryChart,
             numRegex = /^[0-9\.]+$/,
+            lastCommaRegex = /,\s$/,
             quoteRegex = /\"/g,
-            categories = CSVtoArray(csv[1]).slice(4);
+            categories = CSVtoArray(csv[2]).slice(4);
 
         // Parse the CSV into arrays, one array each country
-        $.each(csv.slice(2), function (j, line) {
+        $.each(csv.slice(3), function (j, line) {
             var row = CSVtoArray(line),
                 data = row.slice(4);
 
             $.each(data, function (i, val) {
-
                 val = val.replace(quoteRegex, '');
                 if (numRegex.test(val)) {
                     val = parseInt(val, 10);
-                } else if (!val) {
+                } else if (!val || lastCommaRegex.test(val)) {
                     val = null;
                 }
                 data[i] = val;
             });
+
             countries[row[1]] = {
                 name: row[0],
                 code3: row[1],
@@ -87,7 +89,6 @@ $(function () {
             proceed.apply(this, Array.prototype.slice.call(arguments, 1));
 
             var points = mapChart.getSelectedPoints();
-
             if (points.length) {
                 if (points.length === 1) {
                     $('#info #flag').attr('class', 'flag ' + points[0].flag);
@@ -100,7 +101,7 @@ $(function () {
                 $('#info .subheader').html('<h4>Historical population</h4><small><em>Shift + Click on map to compare countries</em></small>');
 
                 if (!countryChart) {
-                    countryChart = $('#country-chart').highcharts({
+                    countryChart = Highcharts.chart('country-chart', {
                         chart: {
                             height: 250,
                             spacingLeft: 0
@@ -123,7 +124,7 @@ $(function () {
                             opposite: true
                         },
                         tooltip: {
-                            shared: true
+                            split: true
                         },
                         plotOptions: {
                             series: {
@@ -137,7 +138,7 @@ $(function () {
                                 pointStart: parseInt(categories[0], 10)
                             }
                         }
-                    }).highcharts();
+                    });
                 }
 
                 $.each(points, function (i) {
@@ -172,16 +173,13 @@ $(function () {
                     countryChart = countryChart.destroy();
                 }
             }
-
-
-
         });
 
         // Initiate the map chart
-        mapChart = $('#container').highcharts('Map', {
+        mapChart = Highcharts.mapChart('container', {
 
-            title : {
-                text : 'Population history by country'
+            title: {
+                text: 'Population history by country'
             },
 
             subtitle: {
@@ -206,8 +204,8 @@ $(function () {
                 footerFormat: '<span style="font-size: 10px">(Click for details)</span>'
             },
 
-            series : [{
-                data : data,
+            series: [{
+                data: data,
                 mapData: mapData,
                 joinBy: ['iso-a3', 'code3'],
                 name: 'Current population',
@@ -221,9 +219,9 @@ $(function () {
                     }
                 }
             }]
-        }).highcharts();
+        });
 
         // Pre-select a country
         mapChart.get('us').select();
-    });
+    }
 });

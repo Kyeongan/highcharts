@@ -4,7 +4,15 @@ QUnit.test('showInLegend. #5544', function (assert) {
                 renderTo: 'container'
             },
             series: [{
-                data: [1, 2, 3]
+                type: 'heatmap',
+                data: [
+                    [0, 0, 10],
+                    [0, 1, 19],
+                    [0, 2, 8],
+                    [1, 0, 92],
+                    [1, 1, 58],
+                    [1, 2, 78]
+                ]
             }]
         }),
         items = chart.legend.getAllItems(),
@@ -14,9 +22,9 @@ QUnit.test('showInLegend. #5544', function (assert) {
             chart.destroy();
             return Highcharts.chart(newOptions);
         };
-    assert.strictEqual(
-        items[0].isColorAxis,
-        undefined,
+    assert.notEqual(
+        items[0].coll,
+        'colorAxis',
         'colorAxis is not enabled, then it is also not shown in the legend.'
     );
 
@@ -25,8 +33,8 @@ QUnit.test('showInLegend. #5544', function (assert) {
     });
     items = chart.legend.getAllItems();
     assert.strictEqual(
-        items[0].isColorAxis,
-        true,
+        items[0].coll,
+        'colorAxis',
         'colorAxis.showInLegend: true by default'
     );
 
@@ -37,9 +45,16 @@ QUnit.test('showInLegend. #5544', function (assert) {
     });
     items = chart.legend.getAllItems();
     assert.strictEqual(
-        items[0].isColorAxis,
-        undefined,
+        items.length,
+        0,
         'colorAxis.showInLegend: false'
+    );
+
+    chart.series[0].points[0].onMouseOver();
+    assert.strictEqual(
+        chart.container.querySelector('.highcharts-coloraxis-marker'),
+        null,
+        'Marker should not display on hidden color axis'
     );
 
     chart = update(chart, {
@@ -49,8 +64,27 @@ QUnit.test('showInLegend. #5544', function (assert) {
     });
     items = chart.legend.getAllItems();
     assert.strictEqual(
-        items[0].isColorAxis,
-        true,
+        items[0].coll,
+        'colorAxis',
         'colorAxis.showInLegend: true'
     );
+});
+
+QUnit.test('Grid lines, disabled color axis legend', function (assert) {
+
+    var chart = Highcharts.mapChart('container', {
+        chart: {
+            map: 'countries/au/au-all'
+        },
+        legend: {
+            enabled: false
+        },
+        colorAxis: {
+        },
+        series: [{
+            data: [['au-wa', 1], ['au-nt', 0]]
+        }]
+    });
+    var items = chart.container.querySelectorAll('svg > .highcharts-grid-line');
+    assert.notOk(items && items.length, 'No stray ticks when legend disabled.');
 });

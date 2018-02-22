@@ -1,6 +1,6 @@
 /* eslint func-style:0 */
-$(function () {
 
+(function () {
     var addEvent = Highcharts.addEvent,
         fireEvent = Highcharts.fireEvent,
         removeEvent = Highcharts.removeEvent,
@@ -496,7 +496,7 @@ $(function () {
 
     QUnit.test('Event assigned as null (#5311)', function (assert) {
         assert.expect(0);
-        Highcharts.chart('container', {
+        var chart = Highcharts.chart('container', {
 
             chart: {
                 events: {
@@ -510,8 +510,7 @@ $(function () {
 
         });
 
-        Highcharts.charts[0].setSize(400, 300, false);
+        chart.setSize(400, 300, false);
 
     });
-
-});
+}());

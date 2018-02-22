@@ -1,18 +1,38 @@
+/**
+ * (c) 2010-2017 Torstein Honsi
+ *
+ * License: www.highcharts.com/license
+ */
+'use strict';
+import H from '../parts/Globals.js';
+import '../parts/Utilities.js';
+import '../parts/Pointer.js';
+import '../parts/Series.js';
+import '../parts/Pointer.js';
 
-(function () {
+/**
+ * Extensions for polar charts. Additionally, much of the geometry required for
+ * polar charts is gathered in RadialAxes.js.
+ */
+
+var each = H.each,
+	pick = H.pick,
+	Pointer = H.Pointer,
+	Series = H.Series,
+	seriesTypes = H.seriesTypes,
+	wrap = H.wrap,
+
+	seriesProto = Series.prototype,
+	pointerProto = Pointer.prototype,
+	colProto;
+
+if (!H.polarExtended) {
+	H.polarExtended = true;
+
 
 	/**
-	 * Extensions for polar charts. Additionally, much of the geometry required for polar charts is
-	 * gathered in RadialAxes.js.
-	 *
-	 */
-
-	var seriesProto = Series.prototype,
-		pointerProto = Pointer.prototype,
-		colProto;
-
-	/**
-	 * Search a k-d tree by the point angle, used for shared tooltips in polar charts
+	 * Search a k-d tree by the point angle, used for shared tooltips in polar
+	 * charts
 	 */
 	seriesProto.searchPointByAngle = function (e) {
 		var series = this,
@@ -29,23 +49,134 @@
 	};
 
 	/**
-	 * Wrap the buildKDTree function so that it searches by angle (clientX) in case of shared tooltip,
-	 * and by two dimensional distance in case of non-shared.
+	 * #6212 Calculate connectors for spline series in polar chart. 
+	 * @param {Boolean} calculateNeighbours
+	 *        Check if connectors should be calculated for neighbour points as
+	 *        well allows short recurence
+	 */
+	seriesProto.getConnectors = function (
+		segment,
+		index,
+		calculateNeighbours,
+		connectEnds
+	) {
+
+		var i,
+			prevPointInd,
+			nextPointInd,
+			previousPoint,
+			nextPoint,
+			previousX, 
+			previousY, 
+			nextX, 
+			nextY, 
+			plotX, 
+			plotY,
+			ret,
+			// 1 means control points midway between points, 2 means 1/3 from
+			// the point, 3 is 1/4 etc;
+			smoothing = 1.5,
+			denom = smoothing + 1,
+			leftContX,
+			leftContY,
+			rightContX,
+			rightContY,
+			dLControlPoint, // distance left control point
+			dRControlPoint,
+			leftContAngle,
+			rightContAngle,
+			jointAngle,
+			addedNumber = connectEnds ? 1 : 0;
+
+		// Calculate final index of points depending on the initial index value.
+		// Because of calculating neighbours, index may be outisde segment
+		// array.
+		if (index >= 0 && index <= segment.length - 1) {
+			i = index;
+		} else if (index < 0) {
+			i = segment.length - 1 + index;
+		} else {
+			i = 0;
+		}
+
+		prevPointInd = (i - 1 < 0) ? segment.length - (1 + addedNumber) : i - 1;
+		nextPointInd = (i + 1 > segment.length - 1) ? addedNumber : i + 1;
+		previousPoint = segment[prevPointInd];
+		nextPoint = segment[nextPointInd];	
+		previousX = previousPoint.plotX;
+		previousY = previousPoint.plotY;
+		nextX = nextPoint.plotX;
+		nextY = nextPoint.plotY;
+		plotX = segment[i].plotX; // actual point
+		plotY = segment[i].plotY;
+		leftContX = (smoothing * plotX + previousX) / denom;
+		leftContY = (smoothing * plotY + previousY) / denom;
+		rightContX = (smoothing * plotX + nextX) / denom;
+		rightContY = (smoothing * plotY + nextY) / denom;
+		dLControlPoint = Math.sqrt(
+			Math.pow(leftContX - plotX, 2) + Math.pow(leftContY - plotY, 2)
+		);
+		dRControlPoint = Math.sqrt(
+			Math.pow(rightContX - plotX, 2) + Math.pow(rightContY - plotY, 2)
+		);
+		leftContAngle = Math.atan2(leftContY - plotY, leftContX - plotX);
+		rightContAngle = Math.atan2(rightContY - plotY, rightContX - plotX);
+		jointAngle = (Math.PI / 2) + ((leftContAngle + rightContAngle) / 2);
+		// Ensure the right direction, jointAngle should be in the same quadrant
+		// as leftContAngle
+		if (Math.abs(leftContAngle - jointAngle) > Math.PI / 2) {
+			jointAngle -= Math.PI;
+		}
+		// Find the corrected control points for a spline straight through the
+		// point
+		leftContX = plotX + Math.cos(jointAngle) * dLControlPoint;
+		leftContY = plotY + Math.sin(jointAngle) * dLControlPoint;
+		rightContX = plotX + Math.cos(Math.PI + jointAngle) * dRControlPoint;
+		rightContY = plotY + Math.sin(Math.PI + jointAngle) * dRControlPoint;
+
+		// push current point's connectors into returned object
+
+		ret = {
+			rightContX: rightContX,
+			rightContY: rightContY,
+			leftContX: leftContX,
+			leftContY: leftContY,
+			plotX: plotX,
+			plotY: plotY
+		};
+
+		// calculate connectors for previous and next point and push them inside
+		// returned object 
+		if (calculateNeighbours) {
+			ret.prevPointCont = this.getConnectors(
+				segment,
+				prevPointInd,
+				false,
+				connectEnds
+			);
+		}
+		return ret;
+	};
+
+	/**
+	 * Wrap the buildKDTree function so that it searches by angle (clientX) in
+	 * case of shared tooltip, and by two dimensional distance in case of
+	 * non-shared.
 	 */
 	wrap(seriesProto, 'buildKDTree', function (proceed) {
 		if (this.chart.polar) {
 			if (this.kdByAngle) {
 				this.searchPoint = this.searchPointByAngle;
 			} else {
-				this.kdDimensions = 2;
+				this.options.findNearestPointBy = 'xy';
 			}
 		}
 		proceed.apply(this);
 	});
 
 	/**
-	 * Translate a point's plotX and plotY from the internal angle and radius measures to
-	 * true plotX, plotY coordinates
+	 * Translate a point's plotX and plotY from the internal angle and radius
+	 * measures to true plotX, plotY coordinates
 	 */
 	seriesProto.toXY = function (point) {
 		var xy,
@@ -63,10 +194,13 @@
 		point.plotX = point.polarPlotX = xy.x - chart.plotLeft;
 		point.plotY = point.polarPlotY = xy.y - chart.plotTop;
 
-		// If shared tooltip, record the angle in degrees in order to align X points. Otherwise,
-		// use a standard k-d tree to get the nearest point in two dimensions.
+		// If shared tooltip, record the angle in degrees in order to align X
+		// points. Otherwise, use a standard k-d tree to get the nearest point
+		// in two dimensions.
 		if (this.kdByAngle) {
-			clientX = ((plotX / Math.PI * 180) + this.xAxis.pane.options.startAngle) % 360;
+			clientX = (
+				(plotX / Math.PI * 180) + this.xAxis.pane.options.startAngle
+			) % 360;
 			if (clientX < 0) { // #2665
 				clientX += 360;
 			}
@@ -80,122 +214,61 @@
 		/**
 		 * Overridden method for calculating a spline from one point to the next
 		 */
-		wrap(seriesTypes.spline.prototype, 'getPointSpline', function (proceed, segment, point, i) {
+		wrap(
+			seriesTypes.spline.prototype,
+			'getPointSpline',
+			function (proceed, segment, point, i) {
+				var ret,
+					connectors;
 
-			var ret,
-				smoothing = 1.5, // 1 means control points midway between points, 2 means 1/3 from the point, 3 is 1/4 etc;
-				denom = smoothing + 1,
-				plotX,
-				plotY,
-				lastPoint,
-				nextPoint,
-				lastX,
-				lastY,
-				nextX,
-				nextY,
-				leftContX,
-				leftContY,
-				rightContX,
-				rightContY,
-				distanceLeftControlPoint,
-				distanceRightControlPoint,
-				leftContAngle,
-				rightContAngle,
-				jointAngle;
-
-
-			if (this.chart.polar) {
-
-				plotX = point.plotX;
-				plotY = point.plotY;
-				lastPoint = segment[i - 1];
-				nextPoint = segment[i + 1];
-
-				// Connect ends
-				if (this.connectEnds) {
-					if (!lastPoint) {
-						lastPoint = segment[segment.length - 2]; // not the last but the second last, because the segment is already connected
+				if (this.chart.polar) {
+					// moveTo or lineTo
+					if (!i) {
+						ret = ['M', point.plotX, point.plotY];
+					} else { // curve from last point to this
+						connectors = this.getConnectors(
+							segment,
+							i,
+							true,
+							this.connectEnds
+						);
+						ret = [
+							'C',
+							connectors.prevPointCont.rightContX,
+							connectors.prevPointCont.rightContY,
+							connectors.leftContX,
+							connectors.leftContY,
+							connectors.plotX,
+							connectors.plotY
+						];
 					}
-					if (!nextPoint) {
-						nextPoint = segment[1];
-					}
+				} else {
+					ret = proceed.call(this, segment, point, i);
 				}
-
-				// find control points
-				if (lastPoint && nextPoint) {
-
-					lastX = lastPoint.plotX;
-					lastY = lastPoint.plotY;
-					nextX = nextPoint.plotX;
-					nextY = nextPoint.plotY;
-					leftContX = (smoothing * plotX + lastX) / denom;
-					leftContY = (smoothing * plotY + lastY) / denom;
-					rightContX = (smoothing * plotX + nextX) / denom;
-					rightContY = (smoothing * plotY + nextY) / denom;
-					distanceLeftControlPoint = Math.sqrt(Math.pow(leftContX - plotX, 2) + Math.pow(leftContY - plotY, 2));
-					distanceRightControlPoint = Math.sqrt(Math.pow(rightContX - plotX, 2) + Math.pow(rightContY - plotY, 2));
-					leftContAngle = Math.atan2(leftContY - plotY, leftContX - plotX);
-					rightContAngle = Math.atan2(rightContY - plotY, rightContX - plotX);
-					jointAngle = (Math.PI / 2) + ((leftContAngle + rightContAngle) / 2);
-
-
-					// Ensure the right direction, jointAngle should be in the same quadrant as leftContAngle
-					if (Math.abs(leftContAngle - jointAngle) > Math.PI / 2) {
-						jointAngle -= Math.PI;
-					}
-
-					// Find the corrected control points for a spline straight through the point
-					leftContX = plotX + Math.cos(jointAngle) * distanceLeftControlPoint;
-					leftContY = plotY + Math.sin(jointAngle) * distanceLeftControlPoint;
-					rightContX = plotX + Math.cos(Math.PI + jointAngle) * distanceRightControlPoint;
-					rightContY = plotY + Math.sin(Math.PI + jointAngle) * distanceRightControlPoint;
-
-					// Record for drawing in next point
-					point.rightContX = rightContX;
-					point.rightContY = rightContY;
-
-				}
-
-
-				// moveTo or lineTo
-				if (!i) {
-					ret = ['M', plotX, plotY];
-				} else { // curve from last point to this
-					ret = [
-						'C',
-						lastPoint.rightContX || lastPoint.plotX,
-						lastPoint.rightContY || lastPoint.plotY,
-						leftContX || plotX,
-						leftContY || plotY,
-						plotX,
-						plotY
-					];
-					lastPoint.rightContX = lastPoint.rightContY = null; // reset for updating series later
-				}
-
-
-			} else {
-				ret = proceed.call(this, segment, point, i);
+				return ret;
 			}
-			return ret;
-		});
+		);
+
+		// #6430 Areasplinerange series use unwrapped getPointSpline method, so
+		// we need to set this method again.
+		if (seriesTypes.areasplinerange) {
+			seriesTypes.areasplinerange.prototype.getPointSpline =
+				seriesTypes.spline.prototype.getPointSpline;
+		}
 	}
 
 	/**
-	 * Extend translate. The plotX and plotY values are computed as if the polar chart were a
-	 * cartesian plane, where plotX denotes the angle in radians and (yAxis.len - plotY) is the pixel distance from
-	 * center.
+	 * Extend translate. The plotX and plotY values are computed as if the polar
+	 * chart were a cartesian plane, where plotX denotes the angle in radians
+	 * and (yAxis.len - plotY) is the pixel distance from center.
 	 */
-	wrap(seriesProto, 'translate', function (proceed) {
+	H.addEvent(seriesProto, 'afterTranslate', function () {
 		var chart = this.chart,
 			points,
 			i;
 
-		// Run uber method
-		proceed.call(this);
-
-		// Postprocess plot coordinates
 		if (chart.polar) {
+			// Postprocess plot coordinates
 			this.kdByAngle = chart.tooltip && chart.tooltip.shared;
 
 			if (!this.preventPostTranslate) {
@@ -203,21 +276,43 @@
 				i = points.length;
 
 				while (i--) {
-					// Translate plotX, plotY from angle and radius to true plot coordinates
+					// Translate plotX, plotY from angle and radius to true plot
+					// coordinates
 					this.toXY(points[i]);
 				}
+			}
+
+			// Perform clip after render
+			if (!this.hasClipCircleSetter) {
+				this.hasClipCircleSetter = Boolean(
+					H.addEvent(this, 'afterRender', function () {
+						var circ;
+						if (chart.polar) {
+							circ = this.yAxis.center;
+							this.group.clip(
+								chart.renderer.clipCircle(
+									circ[0],
+									circ[1],
+									circ[2] / 2
+								)
+							);
+							this.setClip = H.noop;
+						}
+					})
+				);
 			}
 		}
 	});
 
 	/**
-	 * Extend getSegmentPath to allow connecting ends across 0 to provide a closed circle in
-	 * line-like series.
+	 * Extend getSegmentPath to allow connecting ends across 0 to provide a
+	 * closed circle in line-like series.
 	 */
 	wrap(seriesProto, 'getGraphPath', function (proceed, points) {
 		var series = this,
 			i,
-			firstValid;
+			firstValid,
+			popLastPoint;
 		
 		// Connect the path
 		if (this.chart.polar) {
@@ -230,12 +325,30 @@
 					break;
 				}
 			}
-			if (this.options.connectEnds !== false && firstValid !== undefined) {
+
+
+			/**
+			 * Polar charts only. Whether to connect the ends of a line series
+			 * plot across the extremes.
+			 * 
+			 * @type {Boolean}
+			 * @sample {highcharts} highcharts/plotoptions/line-connectends-false/
+			 *         Do not connect
+			 * @since 2.3.0
+			 * @product highcharts
+			 * @apioption plotOptions.series.connectEnds
+			 */
+			if (
+				this.options.connectEnds !== false &&
+				firstValid !== undefined
+			) {
 				this.connectEnds = true; // re-used in splines
 				points.splice(points.length, 0, points[firstValid]);
+				popLastPoint = true;
 			}
 
-			// For area charts, pseudo points are added to the graph, now we need to translate these
+			// For area charts, pseudo points are added to the graph, now we
+			// need to translate these
 			each(points, function (point) {
 				if (point.polarPlotY === undefined) {
 					series.toXY(point);
@@ -244,12 +357,20 @@
 		}
 
 		// Run uber method
-		return proceed.apply(this, [].slice.call(arguments, 1));
-	
+		var ret = proceed.apply(this, [].slice.call(arguments, 1));
+
+		// #6212 points.splice method is adding points to an array. In case of
+		// areaspline getGraphPath method is used two times and in both times
+		// points are added to an array. That is why points.pop is used, to get
+		// unmodified points.
+		if (popLastPoint) {
+			points.pop();
+		}
+		return ret;
 	});
 
 
-	function polarAnimate(proceed, init) {
+	var polarAnimate = function (proceed, init) {
 		var chart = this.chart,
 			animation = this.options.animation,
 			group = this.group,
@@ -262,8 +383,8 @@
 		// Specific animation for polar charts
 		if (chart.polar) {
 
-			// Enable animation on polar charts only in SVG. In VML, the scaling is different, plus animation
-			// would be so slow it would't matter.
+			// Enable animation on polar charts only in SVG. In VML, the scaling
+			// is different, plus animation would be so slow it would't matter.
 			if (chart.renderer.isSVG) {
 
 				if (animation === true) {
@@ -283,7 +404,6 @@
 
 					group.attr(attribs);
 					if (markerGroup) {
-						//markerGroup.attrSetters = group.attrSetters;
 						markerGroup.attr(attribs);
 					}
 
@@ -309,7 +429,7 @@
 		} else {
 			proceed.call(this, init);
 		}
-	}
+	};
 
 	// Define the animate method for regular series
 	wrap(seriesProto, 'animate', polarAnimate);
@@ -368,7 +488,12 @@
 					start = point.barX + startAngleRad;
 					point.shapeType = 'path';
 					point.shapeArgs = {
-						d: this.polarArc(point.yBottom, point.plotY, start, start + point.pointWidth)
+						d: this.polarArc(
+							point.yBottom,
+							point.plotY,
+							start,
+							start + point.pointWidth
+						)
 					};
 					// Provide correct plotX, plotY for tooltip
 					this.toXY(point);
@@ -382,7 +507,14 @@
 		/**
 		 * Align column data labels outside the columns. #1199.
 		 */
-		wrap(colProto, 'alignDataLabel', function (proceed, point, dataLabel, options, alignTo, isNew) {
+		wrap(colProto, 'alignDataLabel', function (
+			proceed,
+			point,
+			dataLabel,
+			options,
+			alignTo,
+			isNew
+		) {
 
 			if (this.chart.polar) {
 				var angle = point.rectPlotX / Math.PI * 180,
@@ -411,7 +543,14 @@
 					options.verticalAlign = verticalAlign;
 				}
 
-				seriesProto.alignDataLabel.call(this, point, dataLabel, options, alignTo, isNew);
+				seriesProto.alignDataLabel.call(
+					this,
+					point,
+					dataLabel,
+					options,
+					alignTo,
+					isNew
+				);
 			} else {
 				proceed.call(this, point, dataLabel, options, alignTo, isNew);
 			}
@@ -442,7 +581,8 @@
 					value: axis.translate(
 						isXAxis ?
 							Math.PI - Math.atan2(x, y) : // angle
-							Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2)), // distance from center
+							// distance from center
+							Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2)),
 						true
 					)
 				});
@@ -455,4 +595,47 @@
 		return ret;
 	});
 
-}());
+	H.SVGRenderer.prototype.clipCircle = function (x, y, r) {
+		var wrapper,
+			id = H.uniqueKey(),
+
+			clipPath = this.createElement('clipPath').attr({
+				id: id
+			}).add(this.defs);
+
+		wrapper = this.circle(x, y, r).add(clipPath);
+		wrapper.id = id;
+		wrapper.clipPath = clipPath;
+
+		return wrapper;        
+	};
+
+	H.addEvent(H.Chart.prototype, 'beforeGetAxes', function () {
+
+		if (!this.pane) {
+			this.pane = [];
+		}
+		each(H.splat(this.options.pane), function (paneOptions) {
+			new H.Pane( // eslint-disable-line no-new
+				paneOptions,
+				this
+			);
+		}, this);
+	});
+
+	H.addEvent(H.Chart.prototype, 'afterDrawChartBox', function () {
+		each(this.pane, function (pane) {
+			pane.render();
+		});
+	});
+
+	/**
+	 * Extend chart.get to also search in panes. Used internally in
+	 * responsiveness and chart.update.
+	 */
+	wrap(H.Chart.prototype, 'get', function (proceed, id) {
+		return H.find(this.pane, function (pane) {
+			return pane.options.id === id;
+		}) || proceed.call(this, id);
+	});
+}
